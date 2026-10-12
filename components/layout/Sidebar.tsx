@@ -12,6 +12,10 @@ import {
   BarChart3,
   Bell,
   Settings,
+  Sparkles,
+  Package,
+  Presentation,
+  Store,
 } from "lucide-react";
 import { motion } from "framer-motion";
 import { cn } from "@/lib/utils";
@@ -19,6 +23,10 @@ import { cn } from "@/lib/utils";
 const menuItems = [
   { name: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
   { name: "Query Tracker", href: "/queries", icon: MessageSquare },
+  { name: "PPT Builder", href: "/ppt-builder", icon: Presentation },
+  { name: "Recommendations", href: "/recommendations", icon: Sparkles },
+  { name: "Products", href: "/products", icon: Package },
+  { name: "Store Orders", href: "/store-orders", icon: Store },
   { name: "Users", href: "/users", icon: Users },
   { name: "Courses", href: "/courses", icon: BookOpen },
   { name: "Orders", href: "/orders", icon: ShoppingCart },

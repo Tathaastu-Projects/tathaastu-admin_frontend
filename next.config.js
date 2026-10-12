@@ -2,7 +2,10 @@ const { loadEnvConfig } = require("@next/env");
 
 loadEnvConfig(__dirname);
 
-const backendUrl = process.env.BACKEND_URL || "http://localhost:5000";
+const backendUrl = process.env.BACKEND_URL;
+if (!backendUrl) {
+  throw new Error("BACKEND_URL is missing. Set BACKEND_URL in frontend/.env");
+}
 
 /** @type {import('next').NextConfig} */
 const nextConfig = {
@@ -29,6 +32,10 @@ const nextConfig = {
       {
         source: "/api/:path*",
         destination: `${backendUrl}/api/:path*`,
+      },
+      {
+        source: "/uploads/:path*",
+        destination: `${backendUrl}/uploads/:path*`,
       },
     ];
   },
