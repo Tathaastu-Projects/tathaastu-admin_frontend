@@ -65,6 +65,7 @@ interface Product {
   isBestSeller?: boolean;
   isNewArrival?: boolean;
   intentions: string[];
+  hoverDetails?: { label: string }[];
   attributes?: Record<string, string>;
   seo?: { metaTitle?: string; metaDescription?: string };
   linkedRemedyId?: string | null;
@@ -108,6 +109,7 @@ const emptyForm = {
   isBestSeller: false,
   isNewArrival: true,
   intentions: [] as string[],
+  hoverDetails: [] as { label: string }[],
   attributes: {
     face: "",
     stone: "",
@@ -274,6 +276,7 @@ export default function ProductsPage() {
       isBestSeller: Boolean(product.isBestSeller),
       isNewArrival: product.isNewArrival !== false,
       intentions: product.intentions || [],
+      hoverDetails: (product.hoverDetails || []).map((item) => ({ label: item.label || "" })),
       attributes: {
         face: product.attributes?.face || "",
         stone: product.attributes?.stone || "",
@@ -867,6 +870,63 @@ export default function ProductsPage() {
                         <option value="unlisted">Unlisted (hidden)</option>
                       </select>
                     </label>
+                  </div>
+
+                  <div className="rounded-2xl border border-stone-200 bg-stone-50 p-4">
+                    <div className="flex items-start justify-between gap-3">
+                      <div>
+                        <p className="text-sm font-medium text-stone-800">Hover details</p>
+                        <p className="mt-1 text-xs text-stone-500">
+                          These lines appear on the right of the picture when a shopper hovers the product card.
+                        </p>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setForm((prev) => ({
+                            ...prev,
+                            hoverDetails: [...prev.hoverDetails, { label: "" }],
+                          }))
+                        }
+                        className="rounded-xl border border-stone-300 bg-white px-3 py-1.5 text-xs font-semibold text-stone-700"
+                      >
+                        Add line
+                      </button>
+                    </div>
+                    <div className="mt-3 space-y-2">
+                      {form.hoverDetails.map((item, index) => (
+                        <div key={index} className="flex gap-2">
+                          <input
+                            value={item.label}
+                            placeholder="Handcrafted by artisans"
+                            onChange={(e) =>
+                              setForm((prev) => ({
+                                ...prev,
+                                hoverDetails: prev.hoverDetails.map((row, i) =>
+                                  i === index ? { label: e.target.value } : row
+                                ),
+                              }))
+                            }
+                            className="w-full rounded-xl border border-stone-200 bg-white px-3 py-2 text-sm"
+                          />
+                          <button
+                            type="button"
+                            onClick={() =>
+                              setForm((prev) => ({
+                                ...prev,
+                                hoverDetails: prev.hoverDetails.filter((_, i) => i !== index),
+                              }))
+                            }
+                            className="rounded-xl border border-rose-200 px-3 text-xs text-rose-700"
+                          >
+                            Remove
+                          </button>
+                        </div>
+                      ))}
+                      {!form.hoverDetails.length ? (
+                        <p className="text-xs text-stone-500">No hover lines yet. Add one to show details on the card.</p>
+                      ) : null}
+                    </div>
                   </div>
 
                   <label className="block text-sm">

@@ -16,6 +16,7 @@ import {
   Package,
   Presentation,
   Store,
+  Home,
 } from "lucide-react";
 import { motion } from "framer-motion";
 import { cn } from "@/lib/utils";
@@ -26,6 +27,7 @@ const menuItems = [
   { name: "PPT Builder", href: "/ppt-builder", icon: Presentation },
   { name: "Recommendations", href: "/recommendations", icon: Sparkles },
   { name: "Products", href: "/products", icon: Package },
+  { name: "Home Page", href: "/home-page", icon: Home },
   { name: "Store Orders", href: "/store-orders", icon: Store },
   { name: "Users", href: "/users", icon: Users },
   { name: "Courses", href: "/courses", icon: BookOpen },
