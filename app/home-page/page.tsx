@@ -2,12 +2,12 @@
 
 import { useState, type ReactNode } from "react";
 import DashboardLayout from "@/components/layout/DashboardLayout";
+import { AboutSection } from "@/components/homepage/AboutSection";
 import { FeaturedFindsSection } from "@/components/homepage/FeaturedFindsSection";
+import { HomeBannersSection } from "@/components/homepage/HomeBannersSection";
 import { HomeFaqsSection } from "@/components/homepage/HomeFaqsSection";
+import { ShopCategoriesSection } from "@/components/homepage/ShopCategoriesSection";
 import { Home } from "lucide-react";
-import { HomeBannersSection } from "../home-banners/page";
-import { ShopCategoriesSection } from "../shop-categories/page";
-import { AboutSection } from "../about-section/page";
 
 const PORTIONS = [
   {
