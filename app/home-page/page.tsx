@@ -28,7 +28,7 @@ const PORTIONS = [
     id: "portion-about",
     number: "03",
     title: "About",
-    text: "The Abhimantrit paragraph, the four points, and the picture that changes on hover.",
+    text: "The Abhimantrit paragraph and the four points. Paste an image or Drive video link, or upload a photo.",
   },
   {
     id: "portion-faqs",

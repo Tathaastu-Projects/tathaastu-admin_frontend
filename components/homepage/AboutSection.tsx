@@ -8,21 +8,94 @@ type Feature = {
   title: string;
   description: string;
   image?: string;
+  imageUrl?: string;
+  videoUrl?: string;
+  playbackUrl?: string;
 };
 
 type AboutData = {
   image: string;
+  imageUrl?: string;
+  videoUrl?: string;
+  playbackUrl?: string;
   intro: string;
   width: number;
   height: number;
   features: Feature[];
 };
 
+type PointDraft = {
+  title: string;
+  description: string;
+  imageUrl: string;
+  videoUrl: string;
+  playbackUrl: string;
+};
+
 const STORE_ORIGIN = "http://localhost:3025";
+
+async function readPayload(response: Response) {
+  const text = await response.text();
+  try {
+    return JSON.parse(text);
+  } catch {
+    throw new Error(
+      text.startsWith("Internal")
+        ? "The video is still being prepared. Wait a minute, refresh this page, then save again."
+        : text.slice(0, 180) || "Save failed",
+    );
+  }
+}
+
+function driveFileId(url: string) {
+  const file = url.match(/drive\.google\.com\/file\/d\/([a-zA-Z0-9_-]+)/);
+  if (file) return file[1];
+  if (!/drive\.google\.com|googleusercontent\.com/.test(url)) return "";
+  const id = url.match(/[?&]id=([a-zA-Z0-9_-]+)/);
+  return id ? id[1] : "";
+}
+
+function MediaFrame({
+  playback,
+  image,
+  aspect,
+  empty,
+}: {
+  playback?: string;
+  image?: string;
+  aspect: string;
+  empty?: string;
+}) {
+  return (
+    <div className="overflow-hidden rounded-2xl bg-[#f3efe8]" style={{ aspectRatio: aspect }}>
+      {playback ? (
+        <video
+          key={playback}
+          src={previewSrc(playback)}
+          poster={image || undefined}
+          autoPlay
+          loop
+          muted
+          playsInline
+          className="h-full w-full object-cover object-right"
+        />
+      ) : image ? (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img src={image} alt="" className="h-full w-full object-cover object-right" />
+      ) : (
+        <div className="flex h-full items-center justify-center px-3 text-center text-xs text-stone-500">
+          {empty || "No picture yet"}
+        </div>
+      )}
+    </div>
+  );
+}
 
 function previewSrc(url?: string) {
   if (!url) return "";
-  if (url.startsWith("http://") || url.startsWith("https://")) return url;
+  const id = driveFileId(url);
+  if (id) return `https://lh3.googleusercontent.com/d/${id}`;
+  if (url.startsWith("http://") || url.startsWith("https://") || url.startsWith("blob:")) return url;
   if (url.startsWith("/uploads/")) return url;
   return `${STORE_ORIGIN}${url.startsWith("/") ? url : `/${url}`}`;
 }
@@ -32,7 +105,10 @@ export function AboutSection() {
   const [intro, setIntro] = useState("");
   const [baseFile, setBaseFile] = useState<File | null>(null);
   const [basePreview, setBasePreview] = useState("");
-  const [drafts, setDrafts] = useState<Record<string, { title: string; description: string }>>({});
+  const [baseImageUrl, setBaseImageUrl] = useState("");
+  const [baseVideoUrl, setBaseVideoUrl] = useState("");
+  const [basePlayback, setBasePlayback] = useState("");
+  const [drafts, setDrafts] = useState<Record<string, PointDraft>>({});
   const [files, setFiles] = useState<Record<string, File | null>>({});
   const [previews, setPreviews] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(true);
@@ -52,13 +128,22 @@ export function AboutSection() {
       const data = payload.data as AboutData;
       setAbout(data);
       setIntro(data.intro || "");
+      setBaseImageUrl(data.imageUrl || "");
+      setBaseVideoUrl(data.videoUrl || "");
+      setBasePlayback(data.playbackUrl || "");
       setBasePreview(previewSrc(data.image));
       setBaseFile(null);
       setDrafts(
         Object.fromEntries(
           (data.features || []).map((item) => [
             item.id,
-            { title: item.title, description: item.description },
+            {
+              title: item.title,
+              description: item.description,
+              imageUrl: item.imageUrl || "",
+              videoUrl: item.videoUrl || "",
+              playbackUrl: item.playbackUrl || "",
+            },
           ])
         )
       );
@@ -88,9 +173,11 @@ export function AboutSection() {
     try {
       const body = new FormData();
       body.set("intro", intro.trim());
+      body.set("imageUrl", baseImageUrl.trim());
+      body.set("videoUrl", baseVideoUrl.trim());
       if (baseFile) body.set("image", baseFile);
       const response = await fetch("/api/store/admin/about", { method: "PUT", body });
-      const payload = await response.json();
+      const payload = await readPayload(response);
       if (!response.ok || !payload?.success) {
         throw new Error(payload?.message || "Failed to update the section");
       }
@@ -116,13 +203,15 @@ export function AboutSection() {
       const body = new FormData();
       body.set("title", draft.title.trim());
       body.set("description", draft.description.trim());
+      body.set("imageUrl", draft.imageUrl.trim());
+      body.set("videoUrl", draft.videoUrl.trim());
       const file = files[feature.id];
       if (file) body.set("image", file);
       const response = await fetch(`/api/store/admin/about/features/${feature.id}`, {
         method: "PUT",
         body,
       });
-      const payload = await response.json();
+      const payload = await readPayload(response);
       if (!response.ok || !payload?.success) {
         throw new Error(payload?.message || "Failed to update this point");
       }
@@ -144,7 +233,7 @@ export function AboutSection() {
             </div>
             <h2 className="font-serif text-3xl font-semibold text-brand-deepMaroon">About</h2>
             <p className="mt-2 max-w-2xl text-sm text-stone-600">
-              The right-hand picture is {about?.width || 900} × {about?.height || 720} px. Hovering a point on the store swaps that picture for the image you set on that point.
+              Paste a public image or video link, including a Google Drive share link, or upload a photo. A video plays on a loop. The Drive file must be shared as “Anyone with the link”. Hovering a point on the store swaps the picture.
             </p>
           </div>
 
@@ -162,12 +251,11 @@ export function AboutSection() {
               <section className="rounded-[24px] border border-white/80 bg-white/90 p-4 shadow-sm">
                 <h2 className="font-serif text-2xl text-brand-deepMaroon">Default picture and intro</h2>
                 <div className="mt-4 grid gap-4 md:grid-cols-[220px_minmax(0,1fr)]">
-                  <div className="overflow-hidden rounded-2xl bg-[#f3efe8]" style={{ aspectRatio: `${about.width} / ${about.height}` }}>
-                    {basePreview ? (
-                      // eslint-disable-next-line @next/next/no-img-element
-                      <img src={basePreview} alt="" className="h-full w-full object-cover object-right" />
-                    ) : null}
-                  </div>
+                  <MediaFrame
+                    playback={basePlayback}
+                    image={basePreview}
+                    aspect={`${about.width} / ${about.height}`}
+                  />
                   <div className="space-y-3">
                     <p className="text-sm font-medium text-brand-deepMaroon">
                       Image size: {about.width} × {about.height} px
@@ -182,7 +270,19 @@ export function AboutSection() {
                       />
                     </label>
                     <label className="block text-sm text-stone-700">
-                      Default image
+                      Photo link
+                      <input
+                        value={baseImageUrl}
+                        placeholder="https://drive.google.com/file/d/… or a direct image URL"
+                        onChange={(event) => {
+                          setBaseImageUrl(event.target.value);
+                          if (!baseFile) setBasePreview(previewSrc(event.target.value) || previewSrc(about.image));
+                        }}
+                        className="mt-1 w-full rounded-xl border border-stone-200 px-3 py-2"
+                      />
+                    </label>
+                    <label className="block text-sm text-stone-700">
+                      Or upload a photo
                       <input
                         type="file"
                         accept="image/png,image/jpeg,image/webp,image/svg+xml"
@@ -192,6 +292,18 @@ export function AboutSection() {
                           setBaseFile(next);
                           if (next) setBasePreview(URL.createObjectURL(next));
                         }}
+                      />
+                    </label>
+                    <label className="block text-sm text-stone-700">
+                      Video link
+                      <input
+                        value={baseVideoUrl}
+                        placeholder="https://drive.google.com/file/d/… or a direct video URL"
+                        onChange={(event) => {
+                          setBaseVideoUrl(event.target.value);
+                          setBasePlayback("");
+                        }}
+                        className="mt-1 w-full rounded-xl border border-stone-200 px-3 py-2"
                       />
                     </label>
                     <button
@@ -210,16 +322,12 @@ export function AboutSection() {
                 {about.features.map((feature) => (
                   <article key={feature.id} className="rounded-[24px] border border-white/80 bg-white/90 p-4 shadow-sm">
                     <div className="grid gap-4 md:grid-cols-[180px_minmax(0,1fr)]">
-                      <div className="overflow-hidden rounded-2xl bg-[#f3efe8]" style={{ aspectRatio: `${about.width} / ${about.height}` }}>
-                        {previews[feature.id] ? (
-                          // eslint-disable-next-line @next/next/no-img-element
-                          <img src={previews[feature.id]} alt="" className="h-full w-full object-cover object-right" />
-                        ) : (
-                          <div className="flex h-full items-center justify-center px-3 text-center text-xs text-stone-500">
-                            Uses the default picture until you upload one
-                          </div>
-                        )}
-                      </div>
+                      <MediaFrame
+                        playback={drafts[feature.id]?.playbackUrl}
+                        image={previews[feature.id]}
+                        aspect={`${about.width} / ${about.height}`}
+                        empty="Uses the default picture until you add one"
+                      />
                       <div className="space-y-3">
                         <p className="text-sm font-medium text-brand-deepMaroon">
                           Hover image: {about.width} × {about.height} px
@@ -234,6 +342,9 @@ export function AboutSection() {
                                 [feature.id]: {
                                   title: event.target.value,
                                   description: prev[feature.id]?.description || "",
+                                  imageUrl: prev[feature.id]?.imageUrl || "",
+                                  videoUrl: prev[feature.id]?.videoUrl || "",
+                                  playbackUrl: prev[feature.id]?.playbackUrl || "",
                                 },
                               }))
                             }
@@ -250,6 +361,9 @@ export function AboutSection() {
                                 [feature.id]: {
                                   title: prev[feature.id]?.title || "",
                                   description: event.target.value,
+                                  imageUrl: prev[feature.id]?.imageUrl || "",
+                                  videoUrl: prev[feature.id]?.videoUrl || "",
+                                  playbackUrl: prev[feature.id]?.playbackUrl || "",
                                 },
                               }))
                             }
@@ -258,7 +372,31 @@ export function AboutSection() {
                           />
                         </label>
                         <label className="block text-sm text-stone-700">
-                          Image shown on hover
+                          Photo link
+                          <input
+                            value={drafts[feature.id]?.imageUrl || ""}
+                            placeholder="https://drive.google.com/file/d/… or a direct image URL"
+                            onChange={(event) => {
+                              const value = event.target.value;
+                              setDrafts((prev) => ({
+                                ...prev,
+                                [feature.id]: {
+                                  title: prev[feature.id]?.title || "",
+                                  description: prev[feature.id]?.description || "",
+                                  imageUrl: value,
+                                  videoUrl: prev[feature.id]?.videoUrl || "",
+                                  playbackUrl: prev[feature.id]?.playbackUrl || "",
+                                },
+                              }));
+                              if (!files[feature.id]) {
+                                setPreviews((prev) => ({ ...prev, [feature.id]: previewSrc(value) }));
+                              }
+                            }}
+                            className="mt-1 w-full rounded-xl border border-stone-200 px-3 py-2"
+                          />
+                        </label>
+                        <label className="block text-sm text-stone-700">
+                          Or upload a photo
                           <input
                             type="file"
                             accept="image/png,image/jpeg,image/webp,image/svg+xml"
@@ -273,6 +411,26 @@ export function AboutSection() {
                                 }));
                               }
                             }}
+                          />
+                        </label>
+                        <label className="block text-sm text-stone-700">
+                          Video link
+                          <input
+                            value={drafts[feature.id]?.videoUrl || ""}
+                            placeholder="https://drive.google.com/file/d/… or a direct video URL"
+                            onChange={(event) =>
+                              setDrafts((prev) => ({
+                                ...prev,
+                                [feature.id]: {
+                                  title: prev[feature.id]?.title || "",
+                                  description: prev[feature.id]?.description || "",
+                                  imageUrl: prev[feature.id]?.imageUrl || "",
+                                  videoUrl: event.target.value,
+                                  playbackUrl: "",
+                                },
+                              }))
+                            }
+                            className="mt-1 w-full rounded-xl border border-stone-200 px-3 py-2"
                           />
                         </label>
                         <button
