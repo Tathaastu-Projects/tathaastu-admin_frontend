@@ -113,7 +113,7 @@ export function FeaturedFindsSection() {
         </div>
         <h2 className="font-serif text-3xl font-semibold text-brand-deepMaroon">Featured finds</h2>
         <p className="mt-2 max-w-2xl text-sm text-stone-600">
-          This block sits just above Loved by Our Customers. The first frame is a video. The second frame is a photo.
+          This block sits just above Testimonials. The first frame is a video. The second frame is a photo.
         </p>
       </div>
 

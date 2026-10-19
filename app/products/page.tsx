@@ -875,9 +875,9 @@ export default function ProductsPage() {
                   <div className="rounded-2xl border border-stone-200 bg-stone-50 p-4">
                     <div className="flex items-start justify-between gap-3">
                       <div>
-                        <p className="text-sm font-medium text-stone-800">Hover details</p>
+                        <p className="text-sm font-medium text-stone-800">Mouse hover details</p>
                         <p className="mt-1 text-xs text-stone-500">
-                          These lines appear on the right of the picture when a shopper hovers the product card.
+                          These lines show on the right of the photo when the mouse is over the product card. Add one line at a time, then save the product.
                         </p>
                       </div>
                       <button

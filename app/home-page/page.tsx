@@ -7,6 +7,8 @@ import { FeaturedFindsSection } from "@/components/homepage/FeaturedFindsSection
 import { HomeBannersSection } from "@/components/homepage/HomeBannersSection";
 import { HomeFaqsSection } from "@/components/homepage/HomeFaqsSection";
 import { ShopCategoriesSection } from "@/components/homepage/ShopCategoriesSection";
+import { HomeBlogSection } from "@/components/homepage/HomeBlogSection";
+import { TestimonialsSection } from "@/components/homepage/TestimonialsSection";
 import { Home } from "lucide-react";
 
 const PORTIONS = [
@@ -38,7 +40,19 @@ const PORTIONS = [
     id: "portion-featured",
     number: "05",
     title: "Karungali mala",
-    text: "The video and photo shown just before Loved by Our Customers.",
+    text: "The video and photo shown before the testimonials.",
+  },
+  {
+    id: "portion-testimonials",
+    number: "06",
+    title: "Testimonials",
+    text: "The quote cards that slide across the homepage. Change the words, the name, the photo link, and the video link.",
+  },
+  {
+    id: "portion-blog",
+    number: "07",
+    title: "Blog",
+    text: "The photos and videos on Read From Our Blog. Paste a link or upload a photo.",
   },
 ];
 
@@ -48,6 +62,8 @@ const PANELS: Record<string, ReactNode> = {
   "portion-about": <AboutSection />,
   "portion-faqs": <HomeFaqsSection />,
   "portion-featured": <FeaturedFindsSection />,
+  "portion-testimonials": <TestimonialsSection />,
+  "portion-blog": <HomeBlogSection />,
 };
 
 export default function HomePageAdmin() {
