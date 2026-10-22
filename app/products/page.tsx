@@ -137,6 +137,41 @@ function money(value?: number) {
   return `₹${Number(value || 0).toLocaleString("en-IN")}`;
 }
 
+const ALLOWED_CATEGORIES = [
+  "crystal-bracelets",
+  "rudraksha",
+  "crystal-anklets",
+  "tumbles",
+  "crystal-trees",
+  "pyramids",
+  "loose-stones",
+  "mala",
+  "photo-frames",
+  "other",
+];
+
+const CATEGORY_LABELS: Record<string, string> = {
+  "crystal-bracelets": "Crystal Bracelets",
+  "rudraksha": "Rudraksha",
+  "crystal-anklets": "Crystal Anklets",
+  "tumbles": "Tumbles",
+  "crystal-trees": "Crystal Trees",
+  "pyramids": "Pyramids",
+  "loose-stones": "Loose Stones",
+  "mala": "Mala",
+  "photo-frames": "Photo Frames",
+  "other": "Other",
+};
+
+function formatCategoryLabel(cat?: string): string {
+  if (!cat) return "";
+  if (CATEGORY_LABELS[cat]) return CATEGORY_LABELS[cat];
+  return cat
+    .split("-")
+    .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+    .join(" ");
+}
+
 function calcDiscountPercent(mrp: number, salePrice: number) {
   const m = Number(mrp) || 0;
   const s = Number(salePrice) || 0;
@@ -231,8 +266,10 @@ export default function ProductsPage() {
       );
       if (statsPayload?.success) setStats(statsPayload.data || {});
       if (metaPayload?.success) {
+        const raw = metaPayload.data.categories || [];
+        const filtered = raw.filter((c: string) => ALLOWED_CATEGORIES.includes(c));
         setMeta({
-          categories: metaPayload.data.categories || [],
+          categories: filtered.length ? filtered : ALLOWED_CATEGORIES,
           intentions: metaPayload.data.intentions || [],
           remedies: metaPayload.data.remedies || [],
         });
@@ -563,7 +600,7 @@ export default function ProductsPage() {
                 <option value="all">All categories</option>
                 {meta.categories.map((item) => (
                   <option key={item} value={item}>
-                    {item}
+                    {formatCategoryLabel(item)}
                   </option>
                 ))}
               </select>
@@ -685,8 +722,8 @@ export default function ProductsPage() {
                             </div>
                             <div>
                               <p className="font-semibold text-stone-900">{product.title}</p>
-                              <p className="text-xs capitalize text-stone-500">
-                                {product.category}
+                              <p className="text-xs text-stone-500">
+                                <span className="font-medium text-stone-700">{formatCategoryLabel(product.category)}</span>
                                 {product.intentions?.length ? ` · ${product.intentions.join(", ")}` : ""}
                               </p>
                               {product.linkedRemedyName && (
@@ -851,7 +888,7 @@ export default function ProductsPage() {
                       >
                         {meta.categories.map((item) => (
                           <option key={item} value={item}>
-                            {item}
+                            {formatCategoryLabel(item)}
                           </option>
                         ))}
                       </select>

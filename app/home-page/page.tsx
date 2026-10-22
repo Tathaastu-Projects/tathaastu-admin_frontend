@@ -9,6 +9,7 @@ import { HomeFaqsSection } from "@/components/homepage/HomeFaqsSection";
 import { ShopCategoriesSection } from "@/components/homepage/ShopCategoriesSection";
 import { HomeBlogSection } from "@/components/homepage/HomeBlogSection";
 import { TestimonialsSection } from "@/components/homepage/TestimonialsSection";
+import { ScreenToSpaceSection } from "@/components/homepage/ScreenToSpaceSection";
 import { Home } from "lucide-react";
 
 const PORTIONS = [
@@ -43,14 +44,20 @@ const PORTIONS = [
     text: "The video and photo shown before the testimonials.",
   },
   {
-    id: "portion-testimonials",
+    id: "portion-screen-to-space",
     number: "06",
+    title: "Screen to space (Reels)",
+    text: "The shoppable portrait video cards with products and 'SHOP NOW' buttons before testimonials.",
+  },
+  {
+    id: "portion-testimonials",
+    number: "07",
     title: "Testimonials",
     text: "The quote cards that slide across the homepage. Change the words, the name, the photo link, and the video link.",
   },
   {
     id: "portion-blog",
-    number: "07",
+    number: "08",
     title: "Blog",
     text: "The photos and videos on Read From Our Blog. Paste a link or upload a photo.",
   },
@@ -62,6 +69,7 @@ const PANELS: Record<string, ReactNode> = {
   "portion-about": <AboutSection />,
   "portion-faqs": <HomeFaqsSection />,
   "portion-featured": <FeaturedFindsSection />,
+  "portion-screen-to-space": <ScreenToSpaceSection />,
   "portion-testimonials": <TestimonialsSection />,
   "portion-blog": <HomeBlogSection />,
 };
