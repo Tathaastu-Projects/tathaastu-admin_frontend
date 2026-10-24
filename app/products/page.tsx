@@ -21,6 +21,12 @@ import {
   Package,
   History,
   Link2,
+  Download,
+  FileSpreadsheet,
+  CheckCircle2,
+  AlertCircle,
+  Loader2,
+  FileText,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -130,7 +136,6 @@ const emptyForm = {
   linkedRemedyName: "",
   variants: [] as Variant[],
   images: [] as ProductImage[],
-  imageUrlInput: "",
 };
 
 function money(value?: number) {
@@ -204,6 +209,7 @@ export default function ProductsPage() {
   const [audits, setAudits] = useState<AuditItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [uploadingImages, setUploadingImages] = useState(false);
   const [error, setError] = useState("");
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
@@ -216,6 +222,68 @@ export default function ProductsPage() {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [form, setForm] = useState(emptyForm);
   const [showAudits, setShowAudits] = useState(false);
+  const [showImportModal, setShowImportModal] = useState(false);
+  const [importFile, setImportFile] = useState<File | null>(null);
+  const [importing, setImporting] = useState(false);
+  const [importResult, setImportResult] = useState<{
+    success: boolean;
+    message: string;
+    totalParsed?: number;
+    importedCount?: number;
+    failedCount?: number;
+    importedProducts?: Array<{
+      _id: string;
+      title: string;
+      sku?: string;
+      category: string;
+      salePrice: number;
+      status: string;
+    }>;
+    errors?: Array<{ row: number; title: string; error: string }>;
+  } | null>(null);
+  const [importError, setImportError] = useState("");
+
+  const handleDownloadTemplate = () => {
+    window.location.href = "/api/products/excel-template";
+  };
+
+  const handleImportSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!importFile) {
+      setImportError("Please choose an Excel (.xlsx, .xls) or CSV file to import.");
+      return;
+    }
+    setImporting(true);
+    setImportError("");
+    setImportResult(null);
+
+    try {
+      const formData = new FormData();
+      formData.append("file", importFile);
+
+      const res = await fetch("/api/products/excel-import", {
+        method: "POST",
+        body: formData,
+        headers: {
+          "x-actor-name": user?.name || "Admin",
+          "x-actor-email": user?.email || "",
+        },
+      });
+
+      const data = await res.json();
+      if (!res.ok || !data.success) {
+        throw new Error(data.message || "Failed to import products from file.");
+      }
+
+      setImportResult(data);
+      setImportFile(null);
+      loadAll(1);
+    } catch (err: any) {
+      setImportError(err.message || "Failed to process import file.");
+    } finally {
+      setImporting(false);
+    }
+  };
 
   const actorHeaders = useMemo(
     () => ({
@@ -337,7 +405,6 @@ export default function ProductsPage() {
       linkedRemedyName: product.linkedRemedyName || "",
       variants: product.variants || [],
       images: product.images || [],
-      imageUrlInput: "",
     });
     setShowForm(true);
   };
@@ -385,17 +452,57 @@ export default function ProductsPage() {
     }));
   };
 
-  const addImageUrl = () => {
-    const url = form.imageUrlInput.trim();
-    if (!url) return;
-    setForm((prev) => ({
-      ...prev,
-      images: [
-        ...prev.images,
-        { url, alt: prev.title || "Product image", isPrimary: prev.images.length === 0 },
-      ],
-      imageUrlInput: "",
-    }));
+  const uploadFormImages = async (files: FileList | null) => {
+    if (!files?.length) return;
+    setUploadingImages(true);
+    setError("");
+    try {
+      const body = new FormData();
+      Array.from(files).forEach((file) => body.append("images", file));
+      if (form.title.trim()) body.set("alt", form.title.trim());
+
+      const endpoint = editingId
+        ? `/api/products/${editingId}/images`
+        : "/api/products/upload-images";
+      const response = await fetch(endpoint, {
+        method: "POST",
+        headers: {
+          "x-actor-name": user?.name || "Admin",
+          "x-actor-email": user?.email || "",
+        },
+        body,
+      });
+      const data = await response.json();
+      if (!response.ok || !data.success) {
+        throw new Error(data.message || "Image upload failed");
+      }
+
+      if (editingId && data.data && !Array.isArray(data.data)) {
+        // Product document returned from /:id/images
+        setForm((prev) => ({ ...prev, images: data.data.images || [] }));
+        await loadAll();
+        return;
+      }
+
+      const uploaded: ProductImage[] = Array.isArray(data.data) ? data.data : [];
+      setForm((prev) => {
+        const hadImages = prev.images.length > 0;
+        const next = [
+          ...prev.images,
+          ...uploaded.map((img, index) => ({
+            url: img.url,
+            alt: img.alt || prev.title || "Product image",
+            isPrimary: !hadImages && index === 0,
+          })),
+        ];
+        if (next.length && !next.some((img) => img.isPrimary)) next[0].isPrimary = true;
+        return { ...prev, images: next };
+      });
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Image upload failed");
+    } finally {
+      setUploadingImages(false);
+    }
   };
 
   const saveProduct = async () => {
@@ -529,11 +636,33 @@ export default function ProductsPage() {
                 ) : null}
               </p>
             </div>
-            <div className="flex flex-wrap gap-3">
+            <div className="flex flex-wrap items-center gap-3">
+              <button
+                type="button"
+                onClick={handleDownloadTemplate}
+                title="Download ready-to-use Excel template with sample dummy data and instructions"
+                className="inline-flex items-center gap-2 rounded-2xl border border-emerald-600/30 bg-emerald-50/90 px-4 py-2.5 text-sm font-semibold text-emerald-800 shadow-sm transition hover:bg-emerald-100 hover:shadow"
+              >
+                <Download className="h-4 w-4 text-emerald-700" />
+                Download Format
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setImportFile(null);
+                  setImportError("");
+                  setImportResult(null);
+                  setShowImportModal(true);
+                }}
+                className="inline-flex items-center gap-2 rounded-2xl border border-brand-maroon/30 bg-white px-4 py-2.5 text-sm font-semibold text-brand-maroon shadow-sm transition hover:bg-brand-maroon/5 hover:shadow"
+              >
+                <FileSpreadsheet className="h-4 w-4 text-brand-maroon" />
+                Upload Excel
+              </button>
               <button
                 type="button"
                 onClick={() => setShowAudits(true)}
-                className="inline-flex items-center gap-2 rounded-2xl border border-brand-maroon/20 bg-white px-4 py-2.5 text-sm font-medium text-brand-maroon"
+                className="inline-flex items-center gap-2 rounded-2xl border border-brand-maroon/20 bg-white px-4 py-2.5 text-sm font-medium text-brand-maroon shadow-sm transition hover:bg-stone-50"
               >
                 <History className="h-4 w-4" />
                 Audit Log
@@ -541,7 +670,7 @@ export default function ProductsPage() {
               <button
                 type="button"
                 onClick={openCreate}
-                className="inline-flex items-center gap-2 rounded-2xl bg-gradient-to-r from-brand-maroon to-brand-deepMaroon px-5 py-2.5 text-sm font-semibold text-white shadow-lg shadow-brand-maroon/20"
+                className="inline-flex items-center gap-2 rounded-2xl bg-gradient-to-r from-brand-maroon to-brand-deepMaroon px-5 py-2.5 text-sm font-semibold text-white shadow-lg shadow-brand-maroon/20 transition hover:opacity-95"
               >
                 <Plus className="h-4 w-4" />
                 Add Product
@@ -1172,37 +1301,73 @@ export default function ProductsPage() {
 
                   <div className="grid gap-4 md:grid-cols-2">
                     <div className="rounded-2xl border border-stone-200 p-4">
-                      <p className="mb-2 font-medium text-stone-800">Images</p>
-                      <div className="mb-3 flex gap-2">
+                      <p className="mb-1 font-medium text-stone-800">Product images</p>
+                      <p className="mb-3 text-xs text-stone-500">
+                        Select multiple photos from your computer (max 12, ~8&nbsp;MB each). No URL paste.
+                      </p>
+                      <label
+                        className={cn(
+                          "mb-3 flex cursor-pointer flex-col items-center justify-center gap-2 rounded-xl border border-dashed border-brand-maroon/40 bg-brand-softCream/60 px-4 py-6 text-sm text-brand-maroon transition hover:bg-brand-blush/40",
+                          uploadingImages && "pointer-events-none opacity-60",
+                        )}
+                      >
+                        <Upload className="h-5 w-5" />
+                        <span className="font-semibold">
+                          {uploadingImages ? "Uploading…" : "Select & upload images"}
+                        </span>
+                        <span className="text-xs text-stone-500">PNG, JPG, WEBP — multi-select</span>
                         <input
-                          value={form.imageUrlInput}
-                          onChange={(e) => setForm((prev) => ({ ...prev, imageUrlInput: e.target.value }))}
-                          placeholder="Paste image URL"
-                          className="w-full rounded-xl border border-stone-200 px-3 py-2 text-sm"
+                          type="file"
+                          accept="image/png,image/jpeg,image/webp,image/gif"
+                          multiple
+                          className="hidden"
+                          disabled={uploadingImages}
+                          onChange={(e) => {
+                            void uploadFormImages(e.target.files);
+                            e.target.value = "";
+                          }}
                         />
-                        <button type="button" onClick={addImageUrl} className="rounded-xl bg-brand-maroon px-3 text-sm text-white">
-                          Add
-                        </button>
-                      </div>
-                      {editingId && (
-                        <label className="mb-3 inline-flex cursor-pointer items-center gap-2 rounded-xl border border-dashed border-brand-maroon/40 px-3 py-2 text-sm text-brand-maroon">
-                          <Upload className="h-4 w-4" />
-                          Upload files
-                          <input type="file" accept="image/*" multiple className="hidden" onChange={(e) => uploadImages(editingId, e.target.files)} />
-                        </label>
-                      )}
+                      </label>
                       <div className="flex flex-wrap gap-2">
                         {form.images.map((img, index) => (
-                          <div key={`${img.url}-${index}`} className="relative h-20 w-20 overflow-hidden rounded-xl bg-stone-100">
+                          <div
+                            key={`${img.url}-${index}`}
+                            className="relative h-20 w-20 overflow-hidden rounded-xl bg-stone-100 ring-1 ring-stone-200"
+                          >
                             {/* eslint-disable-next-line @next/next/no-img-element */}
                             <img src={img.url} alt={img.alt || ""} className="h-full w-full object-cover" />
+                            {img.isPrimary ? (
+                              <span className="absolute left-1 bottom-1 rounded bg-brand-maroon px-1 text-[9px] font-semibold uppercase text-white">
+                                Main
+                              </span>
+                            ) : (
+                              <button
+                                type="button"
+                                title="Set as main image"
+                                onClick={() =>
+                                  setForm((prev) => ({
+                                    ...prev,
+                                    images: prev.images.map((item, i) => ({
+                                      ...item,
+                                      isPrimary: i === index,
+                                    })),
+                                  }))
+                                }
+                                className="absolute left-1 bottom-1 rounded bg-black/55 px-1 text-[9px] font-semibold uppercase text-white"
+                              >
+                                Set main
+                              </button>
+                            )}
                             <button
                               type="button"
                               onClick={() =>
-                                setForm((prev) => ({
-                                  ...prev,
-                                  images: prev.images.filter((_, i) => i !== index),
-                                }))
+                                setForm((prev) => {
+                                  const next = prev.images.filter((_, i) => i !== index);
+                                  if (next.length && !next.some((item) => item.isPrimary)) {
+                                    next[0].isPrimary = true;
+                                  }
+                                  return { ...prev, images: next };
+                                })
                               }
                               className="absolute right-1 top-1 rounded-full bg-black/60 p-0.5 text-white"
                             >
@@ -1211,6 +1376,9 @@ export default function ProductsPage() {
                           </div>
                         ))}
                       </div>
+                      {!form.images.length ? (
+                        <p className="mt-2 text-xs text-stone-400">No images yet — upload at least one for the store.</p>
+                      ) : null}
                     </div>
 
                     <div className="space-y-3 rounded-2xl border border-stone-200 p-4">
@@ -1313,6 +1481,310 @@ export default function ProductsPage() {
                         {item.note && <p className="mt-1 text-xs text-stone-600">{item.note}</p>}
                       </div>
                     ))
+                  )}
+                </div>
+              </motion.div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
+        <AnimatePresence>
+          {showImportModal && (
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm"
+            >
+              <motion.div
+                initial={{ scale: 0.95, opacity: 0, y: 15 }}
+                animate={{ scale: 1, opacity: 1, y: 0 }}
+                exit={{ scale: 0.95, opacity: 0, y: 15 }}
+                className="flex max-h-[90vh] w-full max-w-2xl flex-col overflow-hidden rounded-3xl bg-white shadow-2xl"
+              >
+                {/* Modal Header */}
+                <div className="flex items-center justify-between border-b border-stone-200/80 bg-gradient-to-r from-brand-softCream to-white px-6 py-4">
+                  <div className="flex items-center gap-3">
+                    <div className="rounded-xl bg-emerald-100 p-2 text-emerald-800">
+                      <FileSpreadsheet className="h-5 w-5" />
+                    </div>
+                    <div>
+                      <h3 className="font-serif text-xl font-semibold text-brand-deepMaroon">
+                        Bulk Import Products from Excel / CSV
+                      </h3>
+                      <p className="text-xs text-stone-500">
+                        Upload an Excel file (.xlsx, .xls) or CSV to add multiple products at once.
+                      </p>
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (!importing) {
+                        setShowImportModal(false);
+                        setImportFile(null);
+                        setImportResult(null);
+                        setImportError("");
+                      }
+                    }}
+                    className="rounded-full p-1 text-stone-400 hover:bg-stone-100 hover:text-stone-700"
+                  >
+                    <X className="h-5 w-5" />
+                  </button>
+                </div>
+
+                {/* Modal Body */}
+                <div className="flex-1 space-y-5 overflow-y-auto p-6">
+                  {/* Download format prompt card */}
+                  <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 rounded-2xl border border-emerald-200/70 bg-emerald-50/70 p-4">
+                    <div className="flex items-start gap-3">
+                      <FileText className="mt-0.5 h-5 w-5 shrink-0 text-emerald-700" />
+                      <div>
+                        <p className="text-sm font-semibold text-emerald-900">
+                          Need the standard Excel format?
+                        </p>
+                        <p className="text-xs text-emerald-700">
+                          Download the pre-filled template with sample dummy data and column guides.
+                        </p>
+                      </div>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={handleDownloadTemplate}
+                      className="inline-flex shrink-0 items-center gap-1.5 rounded-xl bg-emerald-700 px-3.5 py-1.5 text-xs font-semibold text-white shadow-sm hover:bg-emerald-800"
+                    >
+                      <Download className="h-3.5 w-3.5" />
+                      Download Template
+                    </button>
+                  </div>
+
+                  {/* Error banner if any */}
+                  {importError && (
+                    <div className="flex items-start gap-3 rounded-2xl border border-rose-200 bg-rose-50 p-4 text-sm text-rose-800">
+                      <AlertCircle className="mt-0.5 h-5 w-5 shrink-0 text-rose-600" />
+                      <div>
+                        <p className="font-semibold">Import Failed</p>
+                        <p className="mt-0.5 text-xs text-rose-700">{importError}</p>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Result view if import has finished */}
+                  {importResult && (
+                    <div className="space-y-4">
+                      <div className="rounded-2xl border border-emerald-200 bg-emerald-50/90 p-4">
+                        <div className="flex items-center gap-3">
+                          <CheckCircle2 className="h-6 w-6 shrink-0 text-emerald-600" />
+                          <div>
+                            <h4 className="text-base font-semibold text-emerald-900">
+                              Import Process Completed
+                            </h4>
+                            <p className="text-xs text-emerald-700">{importResult.message}</p>
+                          </div>
+                        </div>
+
+                        {/* Mini stats */}
+                        <div className="mt-4 grid grid-cols-3 gap-2 text-center">
+                          <div className="rounded-xl border border-emerald-100 bg-white p-2.5 shadow-sm">
+                            <p className="text-[11px] font-medium uppercase text-stone-500">Total in File</p>
+                            <p className="text-lg font-bold text-stone-800">{importResult.totalParsed || 0}</p>
+                          </div>
+                          <div className="rounded-xl border border-emerald-100 bg-white p-2.5 shadow-sm">
+                            <p className="text-[11px] font-medium uppercase text-emerald-600">Imported</p>
+                            <p className="text-lg font-bold text-emerald-700">{importResult.importedCount || 0}</p>
+                          </div>
+                          <div className="rounded-xl border border-emerald-100 bg-white p-2.5 shadow-sm">
+                            <p className="text-[11px] font-medium uppercase text-rose-500">Failed / Skipped</p>
+                            <p className="text-lg font-bold text-rose-600">{importResult.failedCount || 0}</p>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Created products preview */}
+                      {importResult.importedProducts && importResult.importedProducts.length > 0 && (
+                        <div>
+                          <p className="mb-2 text-xs font-semibold text-stone-700">
+                            Successfully Added Products ({importResult.importedProducts.length}):
+                          </p>
+                          <div className="max-h-40 space-y-1.5 overflow-y-auto rounded-2xl border border-stone-200 bg-stone-50/50 p-3">
+                            {importResult.importedProducts.map((p, idx) => (
+                              <div key={p._id || idx} className="flex items-center justify-between border-b border-stone-100 py-1 text-xs last:border-none">
+                                <span className="max-w-[280px] truncate font-medium text-stone-800">
+                                  {p.title}
+                                </span>
+                                <div className="flex items-center gap-2">
+                                  <span className="text-stone-500">{p.sku || ""}</span>
+                                  <span className="font-semibold text-brand-maroon">{money(p.salePrice)}</span>
+                                  <span className={cn("rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase", statusTone(p.status as ProductStatus))}>
+                                    {p.status}
+                                  </span>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Error rows preview */}
+                      {importResult.errors && importResult.errors.length > 0 && (
+                        <div>
+                          <p className="mb-2 text-xs font-semibold text-rose-700">
+                            Skipped / Error Rows ({importResult.errors.length}):
+                          </p>
+                          <div className="max-h-36 space-y-1.5 overflow-y-auto rounded-2xl border border-rose-200 bg-rose-50/40 p-3 text-xs">
+                            {importResult.errors.map((err, idx) => (
+                              <div key={idx} className="flex items-start gap-2 py-0.5 text-rose-800">
+                                <span className="shrink-0 font-bold">Row {err.row}:</span>
+                                <span>{err.title} — {err.error}</span>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {/* Upload Form */}
+                  {!importResult && (
+                    <form onSubmit={handleImportSubmit} className="space-y-4">
+                      {/* Drag & Drop Zone */}
+                      <div
+                        onDragOver={(e) => e.preventDefault()}
+                        onDrop={(e) => {
+                          e.preventDefault();
+                          const f = e.dataTransfer.files?.[0];
+                          if (f) setImportFile(f);
+                        }}
+                        className="relative flex flex-col items-center justify-center rounded-2xl border-2 border-dashed border-stone-300 bg-stone-50/80 p-8 text-center transition hover:border-brand-maroon/50 hover:bg-stone-50"
+                      >
+                        <input
+                          id="excelFileInput"
+                          type="file"
+                          accept=".xlsx,.xls,.csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel,text/csv"
+                          onChange={(e) => {
+                            const f = e.target.files?.[0] || null;
+                            setImportFile(f);
+                          }}
+                          className="absolute inset-0 h-full w-full cursor-pointer opacity-0"
+                        />
+                        <div className="rounded-2xl border border-stone-200/80 bg-white p-3 text-brand-maroon shadow-sm">
+                          <Upload className="h-7 w-7" />
+                        </div>
+                        <p className="mt-3 text-sm font-semibold text-stone-800">
+                          {importFile ? importFile.name : "Click to browse or drag and drop your file here"}
+                        </p>
+                        <p className="mt-1 text-xs text-stone-500">
+                          {importFile
+                            ? `${(importFile.size / 1024).toFixed(1)} KB · Ready to import`
+                            : "Supports Microsoft Excel (.xlsx, .xls) and CSV (.csv)"}
+                        </p>
+                        {importFile && (
+                          <div className="mt-3 flex items-center gap-2">
+                            <span className="rounded-full bg-emerald-100 px-3 py-1 text-xs font-semibold text-emerald-800">
+                              Selected: {importFile.name}
+                            </span>
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setImportFile(null);
+                              }}
+                              className="text-xs text-rose-600 hover:underline"
+                            >
+                              Change file
+                            </button>
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Multiple Images Highlight Box */}
+                      <div className="rounded-2xl border border-amber-200/80 bg-amber-50/70 p-4 text-xs text-amber-900 space-y-1.5">
+                        <p className="font-semibold text-amber-950 flex items-center gap-1.5 text-[12px]">
+                          <span>📸</span> How to Add Multiple Images for Every Product:
+                        </p>
+                        <p className="text-amber-900 leading-relaxed">
+                          In the Excel template, you can add multiple photos in two easy ways:
+                        </p>
+                        <ul className="list-disc list-inside space-y-1 text-amber-800 ml-1">
+                          <li>
+                            <strong className="text-amber-950">Option A (Separate Columns):</strong> Use <code>Primary Image URL</code> for the cover photo, and <code>Image 2 URL</code>, <code>Image 3 URL</code>, <code>Image 4 URL</code>, <code>Image 5 URL</code> for gallery photos.
+                          </li>
+                          <li>
+                            <strong className="text-amber-950">Option B (All in one column):</strong> In <code>All Images (Comma Separated)</code>, paste all your links separated by comma: <code>url1, url2, url3</code>
+                          </li>
+                          <li>
+                            Both direct URLs (https://...) and <strong>Google Drive share links</strong> (drive.google.com/file/d/...) are automatically recognized!
+                          </li>
+                        </ul>
+                      </div>
+
+                      {/* Complete Field Checklist */}
+                      <div className="space-y-2 rounded-2xl border border-stone-200/80 bg-stone-50/60 p-4 text-xs text-stone-600">
+                        <p className="text-[11px] font-semibold uppercase tracking-wider text-stone-800">
+                          All Manual Product Fields Included in Excel Format:
+                        </p>
+                        <div className="grid sm:grid-cols-2 gap-x-4 gap-y-1.5 text-[11px]">
+                          <div><strong className="text-stone-800">Basic:</strong> Title *, SKU, Category, Status</div>
+                          <div><strong className="text-stone-800">Pricing & Stock:</strong> MRP, Sale Price, Discount %, Quantity, Low Stock Alert</div>
+                          <div><strong className="text-stone-800">Descriptions:</strong> Short & Full Description, Mouse Hover Details (| separated)</div>
+                          <div><strong className="text-stone-800">Badges & Intentions:</strong> New Badge, Featured, Best Seller, Intention Tags</div>
+                          <div><strong className="text-stone-800">All Attributes:</strong> Face, Stone, Shape, Weight, Gender, Color, Occasion, Zodiac, Material, Mukhi, Jewelry Type, Planet, Origin</div>
+                          <div><strong className="text-stone-800">Variants & SEO:</strong> Variants (mukhi/size/price/stock), Meta Title, Meta Description, Link Remedy</div>
+                        </div>
+                      </div>
+                    </form>
+                  )}
+                </div>
+
+                {/* Modal Footer */}
+                <div className="flex items-center justify-between border-t border-stone-200 bg-stone-50/50 px-6 py-4">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (!importing) {
+                        setShowImportModal(false);
+                        setImportFile(null);
+                        setImportResult(null);
+                        setImportError("");
+                      }
+                    }}
+                    className="rounded-xl border border-stone-200 bg-white px-4 py-2 text-sm font-medium text-stone-700 hover:bg-stone-50"
+                  >
+                    {importResult ? "Close" : "Cancel"}
+                  </button>
+
+                  {!importResult ? (
+                    <button
+                      type="button"
+                      disabled={!importFile || importing}
+                      onClick={handleImportSubmit}
+                      className="inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-brand-maroon to-brand-deepMaroon px-5 py-2 text-sm font-semibold text-white shadow-md shadow-brand-maroon/20 hover:opacity-95 disabled:opacity-50"
+                    >
+                      {importing ? (
+                        <>
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                          Importing Products...
+                        </>
+                      ) : (
+                        <>
+                          <Upload className="h-4 w-4" />
+                          Import Products
+                        </>
+                      )}
+                    </button>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setImportResult(null);
+                        setImportFile(null);
+                        setImportError("");
+                      }}
+                      className="inline-flex items-center gap-2 rounded-xl border border-brand-maroon/30 bg-white px-4 py-2 text-sm font-semibold text-brand-maroon hover:bg-brand-softCream"
+                    >
+                      <Plus className="h-4 w-4" />
+                      Import Another File
+                    </button>
                   )}
                 </div>
               </motion.div>

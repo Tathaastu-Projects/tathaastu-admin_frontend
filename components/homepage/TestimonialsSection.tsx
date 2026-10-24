@@ -125,6 +125,38 @@ export function TestimonialsSection() {
     }
   };
 
+  const deletePhoto = (index: number) => {
+    if (!window.confirm("Remove photo from this testimonial?")) return;
+    setItems((prev) =>
+      prev.map((row, i) => (i === index ? { ...row, imageUrl: "", file: null, preview: "" } : row))
+    );
+  };
+
+  const deleteVideo = (index: number) => {
+    if (!window.confirm("Remove video from this testimonial?")) return;
+    setItems((prev) =>
+      prev.map((row, i) => (i === index ? { ...row, videoUrl: "", playbackUrl: "" } : row))
+    );
+  };
+
+  const deleteTestimonial = async (index: number) => {
+    const item = items[index];
+    const name = item?.name?.trim() || `Testimonial #${index + 1}`;
+    if (!window.confirm(`Delete testimonial from "${name}"?`)) return;
+    const next = items.filter((_, i) => i !== index);
+    setItems(next);
+    try {
+      const res = await fetch(`/api/store/admin/testimonials/${index}`, { method: "DELETE" });
+      const payload = await res.json();
+      if (res.ok && payload.success && Array.isArray(payload.data)) {
+        setItems(payload.data.map((row: SavedItem) => toItem(row)));
+        setSaved("Testimonial deleted");
+      }
+    } catch (_e) {
+      // Local state already updated
+    }
+  };
+
   return (
     <div className="space-y-5">
       <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
@@ -161,24 +193,63 @@ export function TestimonialsSection() {
         {items.map((item, index) => (
           <article key={index} className="rounded-[24px] border border-white/80 bg-white/90 p-4 shadow-sm">
             <div className="grid gap-4 md:grid-cols-[180px_1fr]">
-              <div className="h-36 overflow-hidden rounded-xl bg-[#ececec]">
-                {item.playbackUrl ? (
-                  <video
-                    key={item.playbackUrl}
-                    src={previewSrc(item.playbackUrl)}
-                    poster={item.preview || undefined}
-                    autoPlay
-                    loop
-                    muted
-                    playsInline
-                    className="h-full w-full object-cover"
-                  />
-                ) : item.preview ? (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img src={item.preview} alt="" className="h-full w-full object-cover" />
-                ) : null}
+              <div className="flex flex-col gap-2">
+                <div className="h-36 overflow-hidden rounded-xl bg-[#ececec]">
+                  {item.playbackUrl ? (
+                    <video
+                      key={item.playbackUrl}
+                      src={previewSrc(item.playbackUrl)}
+                      poster={item.preview || undefined}
+                      autoPlay
+                      loop
+                      muted
+                      playsInline
+                      className="h-full w-full object-cover"
+                    />
+                  ) : item.preview ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img src={item.preview} alt="" className="h-full w-full object-cover" />
+                  ) : (
+                    <div className="flex h-full items-center justify-center p-2 text-center text-xs text-stone-400">
+                      No photo or video
+                    </div>
+                  )}
+                </div>
+                <div className="flex flex-wrap gap-1">
+                  {item.preview || item.imageUrl || item.file ? (
+                    <button
+                      type="button"
+                      onClick={() => deletePhoto(index)}
+                      className="inline-flex items-center gap-1 rounded-lg border border-rose-300 bg-rose-50 px-2 py-1 text-xs font-semibold text-rose-700 transition hover:bg-rose-100"
+                    >
+                      <Trash2 className="h-3 w-3" />
+                      Delete photo
+                    </button>
+                  ) : null}
+                  {item.playbackUrl || item.videoUrl ? (
+                    <button
+                      type="button"
+                      onClick={() => deleteVideo(index)}
+                      className="inline-flex items-center gap-1 rounded-lg border border-rose-300 bg-rose-50 px-2 py-1 text-xs font-semibold text-rose-700 transition hover:bg-rose-100"
+                    >
+                      <Trash2 className="h-3 w-3" />
+                      Delete video
+                    </button>
+                  ) : null}
+                </div>
               </div>
               <div className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <p className="text-sm font-semibold text-brand-maroon">Testimonial #{index + 1}</p>
+                  <button
+                    type="button"
+                    onClick={() => deleteTestimonial(index)}
+                    className="inline-flex items-center gap-1 rounded-lg border border-rose-300 bg-rose-50 px-2.5 py-1 text-xs font-semibold text-rose-700 hover:bg-rose-100 transition"
+                  >
+                    <Trash2 className="h-3.5 w-3.5" />
+                    Delete testimonial
+                  </button>
+                </div>
                 <label className="block text-sm text-stone-700">
                   Quote
                   <textarea
@@ -258,14 +329,6 @@ export function TestimonialsSection() {
                     className="mt-1 w-full rounded-xl border border-stone-200 px-3 py-2"
                   />
                 </label>
-                <button
-                  type="button"
-                  onClick={() => setItems((prev) => prev.filter((_, i) => i !== index))}
-                  className="inline-flex items-center gap-1 text-sm text-rose-700"
-                >
-                  <Trash2 className="h-4 w-4" />
-                  Remove
-                </button>
               </div>
             </div>
           </article>

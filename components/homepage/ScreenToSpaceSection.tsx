@@ -127,7 +127,10 @@ export function ScreenToSpaceSection() {
   };
 
   const handleRemoveItem = (index: number) => {
-    setItems(items.filter((_, i) => i !== index));
+    const item = items[index];
+    const name = item?.productTitle || `Reel Card #${index + 1}`;
+    if (!window.confirm(`Delete reel card "${name}"?`)) return;
+    setItems((prev) => prev.filter((_, i) => i !== index));
   };
 
   const handleMove = (index: number, direction: "up" | "down") => {
@@ -475,9 +478,10 @@ export function ScreenToSpaceSection() {
                           type="button"
                           onClick={() => handleRemoveItem(index)}
                           aria-label="Delete card"
-                          className="rounded p-1 text-rose-500 hover:bg-rose-50 ml-1"
+                          className="inline-flex items-center gap-1 rounded-lg border border-rose-300 bg-rose-50 px-2 py-1 text-xs font-semibold text-rose-700 hover:bg-rose-100 ml-1 transition"
                         >
-                          <Trash2 className="h-4 w-4" />
+                          <Trash2 className="h-3.5 w-3.5" />
+                          Delete card
                         </button>
                       </div>
                     </div>
@@ -510,9 +514,25 @@ export function ScreenToSpaceSection() {
                     <div className="grid gap-3 sm:grid-cols-2">
                       {/* Video Media */}
                       <div>
-                        <label className="block text-xs font-semibold text-stone-700">
-                          Video (MP4 or WebM)
-                        </label>
+                        <div className="flex items-center justify-between">
+                          <label className="block text-xs font-semibold text-stone-700">
+                            Video (MP4 or WebM)
+                          </label>
+                          {item.videoUrl ? (
+                            <button
+                              type="button"
+                              onClick={() => {
+                                if (window.confirm("Remove video from this reel card?")) {
+                                  handleUpdateItem(index, { videoUrl: "" });
+                                }
+                              }}
+                              className="inline-flex items-center gap-1 text-[11px] font-medium text-rose-600 hover:text-rose-700"
+                            >
+                              <Trash2 className="h-3 w-3" />
+                              Delete video
+                            </button>
+                          ) : null}
+                        </div>
                         <div className="mt-1 flex gap-2">
                           <input
                             type="text"
@@ -539,9 +559,25 @@ export function ScreenToSpaceSection() {
 
                       {/* Poster / Fallback Image */}
                       <div>
-                        <label className="block text-xs font-semibold text-stone-700">
-                          Poster / Cover Image
-                        </label>
+                        <div className="flex items-center justify-between">
+                          <label className="block text-xs font-semibold text-stone-700">
+                            Poster / Cover Image
+                          </label>
+                          {item.imageUrl ? (
+                            <button
+                              type="button"
+                              onClick={() => {
+                                if (window.confirm("Remove cover photo from this reel card?")) {
+                                  handleUpdateItem(index, { imageUrl: "" });
+                                }
+                              }}
+                              className="inline-flex items-center gap-1 text-[11px] font-medium text-rose-600 hover:text-rose-700"
+                            >
+                              <Trash2 className="h-3 w-3" />
+                              Delete photo
+                            </button>
+                          ) : null}
+                        </div>
                         <div className="mt-1 flex gap-2">
                           <input
                             type="text"
@@ -610,9 +646,25 @@ export function ScreenToSpaceSection() {
 
                       {/* Product Thumbnail URL / Upload */}
                       <div>
-                        <label className="block text-xs font-semibold text-stone-700">
-                          Product Thumbnail Image
-                        </label>
+                        <div className="flex items-center justify-between">
+                          <label className="block text-xs font-semibold text-stone-700">
+                            Product Thumbnail Image
+                          </label>
+                          {item.productImage ? (
+                            <button
+                              type="button"
+                              onClick={() => {
+                                if (window.confirm("Remove thumbnail from this product?")) {
+                                  handleUpdateItem(index, { productImage: "" });
+                                }
+                              }}
+                              className="inline-flex items-center gap-1 text-[11px] font-medium text-rose-600 hover:text-rose-700"
+                            >
+                              <Trash2 className="h-3 w-3" />
+                              Delete photo
+                            </button>
+                          ) : null}
+                        </div>
                         <div className="mt-1 flex gap-2">
                           <input
                             type="text"

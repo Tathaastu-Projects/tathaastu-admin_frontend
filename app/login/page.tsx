@@ -3,42 +3,50 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { useAuthStore } from "@/store/authStore";
-import { motion } from "framer-motion";
 
 export default function LoginPage() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [error, setError] = useState("");
+  const [loading, setLoading] = useState(false);
   const router = useRouter();
   const login = useAuthStore((state) => state.login);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    // Bypass authentication - just login
-    login(email || "admin@tathasstu.com", password || "admin");
-    router.push("/dashboard");
+    setError("");
+    if (!email.trim() || !password) {
+      setError("Email and password are required");
+      return;
+    }
+    setLoading(true);
+    try {
+      await login(email.trim(), password);
+      router.push("/dashboard");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Login failed");
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-spiritual-purple via-spiritual-darkPurple to-spiritual-gold p-4">
-      <motion.div
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.5 }}
-        className="bg-white rounded-2xl shadow-2xl p-8 w-full max-w-md"
-      >
+      <div className="bg-white rounded-2xl shadow-2xl p-8 w-full max-w-md">
         <div className="text-center mb-8">
-          <h1 className="text-3xl font-bold text-spiritual-darkPurple mb-2">
-            Tathasstu
-          </h1>
-          <p className="text-gray-600">Admin Dashboard</p>
+          <h1 className="text-3xl font-bold text-spiritual-darkPurple mb-2">Tathasstu</h1>
+          <p className="text-gray-600">Admin Dashboard Login</p>
         </div>
 
-        <form onSubmit={handleSubmit} className="space-y-6">
+        <form onSubmit={handleSubmit} className="space-y-5">
+          {error ? (
+            <p className="rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-800">
+              {error}
+            </p>
+          ) : null}
+
           <div>
-            <label
-              htmlFor="email"
-              className="block text-sm font-medium text-gray-700 mb-2"
-            >
+            <label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-2">
               Email
             </label>
             <input
@@ -46,16 +54,15 @@ export default function LoginPage() {
               type="email"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
+              required
+              autoComplete="username"
               className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-spiritual-purple focus:border-transparent outline-none transition"
-              placeholder="admin@tathasstu.com"
+              placeholder="Enter email"
             />
           </div>
 
           <div>
-            <label
-              htmlFor="password"
-              className="block text-sm font-medium text-gray-700 mb-2"
-            >
+            <label htmlFor="password" className="block text-sm font-medium text-gray-700 mb-2">
               Password
             </label>
             <input
@@ -63,26 +70,22 @@ export default function LoginPage() {
               type="password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
+              required
+              autoComplete="current-password"
               className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-spiritual-purple focus:border-transparent outline-none transition"
               placeholder="Enter password"
             />
           </div>
 
-          <motion.button
-            whileHover={{ scale: 1.02 }}
-            whileTap={{ scale: 0.98 }}
+          <button
             type="submit"
-            className="w-full bg-gradient-to-r from-spiritual-purple to-spiritual-darkPurple text-white py-3 rounded-lg font-semibold hover:shadow-lg transition-shadow"
+            disabled={loading}
+            className="w-full bg-gradient-to-r from-spiritual-purple to-spiritual-darkPurple text-white py-3 rounded-lg font-semibold hover:shadow-lg transition-shadow disabled:opacity-60"
           >
-            Login
-          </motion.button>
-
-          <p className="text-xs text-center text-gray-500">
-            Authentication bypassed for development
-          </p>
+            {loading ? "Signing in…" : "Login"}
+          </button>
         </form>
-      </motion.div>
+      </div>
     </div>
   );
 }
-

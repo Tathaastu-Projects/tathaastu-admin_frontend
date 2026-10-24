@@ -68,6 +68,55 @@ export function HomeFaqsSection() {
     }
   };
 
+  const deleteFaq = async (index: number) => {
+    const qTitle = faqs[index]?.question?.trim() || `Q${index + 1}`;
+    const ok = window.confirm(`Delete question "${qTitle}"?`);
+    if (!ok) return;
+    const next = faqs.filter((_, i) => i !== index);
+    setFaqs(next);
+    setSaving(true);
+    setError("");
+    setSaved("");
+    try {
+      const response = await fetch(`/api/store/admin/faqs/${index}`, {
+        method: "DELETE",
+      });
+      const payload = await response.json();
+      if (!response.ok || !payload?.success) {
+        await save(next);
+        return;
+      }
+      setFaqs(payload.data || next);
+      setSaved(`Question deleted successfully`);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to delete FAQ");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const clearAllFaqs = async () => {
+    if (!faqs.length) return;
+    const ok = window.confirm("Are you sure you want to delete ALL FAQs from the homepage?");
+    if (!ok) return;
+    setSaving(true);
+    setError("");
+    setSaved("");
+    try {
+      const response = await fetch("/api/store/admin/faqs", { method: "DELETE" });
+      const payload = await response.json();
+      if (!response.ok || !payload?.success) {
+        throw new Error(payload?.message || "Failed to clear FAQs");
+      }
+      setFaqs([]);
+      setSaved("All FAQs removed");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to clear FAQs");
+    } finally {
+      setSaving(false);
+    }
+  };
+
   return (
     <div className="space-y-5">
       <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
@@ -81,14 +130,27 @@ export function HomeFaqsSection() {
             These questions appear at the bottom of the store homepage, in this order. Q1 is the first row.
           </p>
         </div>
-        <button
-          type="button"
-          onClick={() => setFaqs((prev) => [...prev, { question: "", answer: "" }])}
-          className="inline-flex items-center gap-2 rounded-2xl bg-gradient-to-r from-brand-maroon to-brand-deepMaroon px-5 py-2.5 text-sm font-semibold text-white shadow-lg shadow-brand-maroon/20"
-        >
-          <Plus className="h-4 w-4" />
-          Add question
-        </button>
+        <div className="flex flex-wrap items-center gap-2">
+          {faqs.length > 0 ? (
+            <button
+              type="button"
+              onClick={clearAllFaqs}
+              disabled={saving}
+              className="inline-flex items-center gap-1.5 rounded-2xl border border-rose-300 bg-rose-50 px-4 py-2.5 text-sm font-semibold text-rose-700 transition hover:bg-rose-100 disabled:opacity-50"
+            >
+              <Trash2 className="h-4 w-4" />
+              Delete all FAQs
+            </button>
+          ) : null}
+          <button
+            type="button"
+            onClick={() => setFaqs((prev) => [...prev, { question: "", answer: "" }])}
+            className="inline-flex items-center gap-2 rounded-2xl bg-gradient-to-r from-brand-maroon to-brand-deepMaroon px-5 py-2.5 text-sm font-semibold text-white shadow-lg shadow-brand-maroon/20"
+          >
+            <Plus className="h-4 w-4" />
+            Add question
+          </button>
+        </div>
       </div>
 
       {error ? (
@@ -108,11 +170,12 @@ export function HomeFaqsSection() {
                 <p className="text-sm font-semibold text-brand-maroon">Q{index + 1}</p>
                 <button
                   type="button"
-                  onClick={() => setFaqs((prev) => prev.filter((_, i) => i !== index))}
-                  className="inline-flex items-center gap-1 rounded-xl border border-rose-200 px-3 py-1.5 text-sm text-rose-700"
+                  onClick={() => deleteFaq(index)}
+                  disabled={saving}
+                  className="inline-flex items-center gap-1.5 rounded-xl border border-rose-300 bg-rose-50 px-3 py-1.5 text-sm font-semibold text-rose-700 transition hover:border-rose-400 hover:bg-rose-100 disabled:opacity-50"
                 >
                   <Trash2 className="h-4 w-4" />
-                  Remove
+                  Delete FAQ
                 </button>
               </div>
               <label className="block text-sm text-stone-700">
@@ -134,6 +197,11 @@ export function HomeFaqsSection() {
               </label>
             </article>
           ))}
+          {!faqs.length ? (
+            <p className="rounded-[24px] border border-dashed border-stone-300 bg-white/70 px-4 py-8 text-center text-sm text-stone-500">
+              No FAQs yet. Click &ldquo;Add question&rdquo; above to create one.
+            </p>
+          ) : null}
           <div className="flex justify-end">
             <button
               type="button"

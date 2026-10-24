@@ -140,7 +140,9 @@ export default function StoreOrdersPage() {
       if (statusFilter !== "all") params.set("status", statusFilter);
       if (query.trim()) params.set("q", query.trim());
 
-      const response = await fetch(`/api/store/admin/orders?${params.toString()}`);
+      const response = await fetch(`/api/store/admin/orders?${params.toString()}`, {
+        cache: "no-store",
+      });
       const json = await response.json();
       if (!response.ok || !json.success) {
         throw new Error(json.message || "Failed to load store orders");

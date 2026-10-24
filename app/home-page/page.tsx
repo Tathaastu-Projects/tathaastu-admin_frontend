@@ -10,6 +10,7 @@ import { ShopCategoriesSection } from "@/components/homepage/ShopCategoriesSecti
 import { HomeBlogSection } from "@/components/homepage/HomeBlogSection";
 import { TestimonialsSection } from "@/components/homepage/TestimonialsSection";
 import { ScreenToSpaceSection } from "@/components/homepage/ScreenToSpaceSection";
+import { CategoryBannersSection } from "@/components/homepage/CategoryBannersSection";
 import { Home } from "lucide-react";
 
 const PORTIONS = [
@@ -61,6 +62,12 @@ const PORTIONS = [
     title: "Blog",
     text: "The photos and videos on Read From Our Blog. Paste a link or upload a photo.",
   },
+  {
+    id: "portion-category-banners",
+    number: "09",
+    title: "Category Banners",
+    text: "Custom banners for Crystal Bracelets, Rudraksha, Anklets, Trees, Pyramids, and all categories.",
+  },
 ];
 
 const PANELS: Record<string, ReactNode> = {
@@ -72,6 +79,7 @@ const PANELS: Record<string, ReactNode> = {
   "portion-screen-to-space": <ScreenToSpaceSection />,
   "portion-testimonials": <TestimonialsSection />,
   "portion-blog": <HomeBlogSection />,
+  "portion-category-banners": <CategoryBannersSection />,
 };
 
 export default function HomePageAdmin() {
