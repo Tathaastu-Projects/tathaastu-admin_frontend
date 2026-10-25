@@ -30,7 +30,20 @@ function friendlyError(status: number, body: string): string | null {
   return null;
 }
 
-export async function parseApiJson<T = Record<string, unknown>>(response: Response): Promise<T> {
+export type ApiJson = {
+  success?: boolean;
+  message?: string;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  data?: any;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  [key: string]: any;
+};
+
+export function asErrorMessage(value: unknown, fallback: string): string {
+  return typeof value === "string" && value.trim() ? value : fallback;
+}
+
+export async function parseApiJson<T = ApiJson>(response: Response): Promise<T> {
   const text = await response.text();
   const trimmed = text.trim();
 
@@ -55,7 +68,7 @@ export async function parseApiJson<T = Record<string, unknown>>(response: Respon
   }
 }
 
-export async function fetchApiJson<T = Record<string, unknown>>(
+export async function fetchApiJson<T = ApiJson>(
   input: RequestInfo | URL,
   init?: RequestInit
 ): Promise<{ response: Response; data: T }> {

@@ -12,8 +12,6 @@ const nextConfig = {
   reactStrictMode: true,
   experimental: {
     proxyTimeout: 300000,
-    // Allow large multipart bodies through the Pages API proxy (video uploads ~120MB)
-    middlewareClientMaxBodySize: "150mb",
   },
   webpack: (config) => {
     config.resolve.alias = {

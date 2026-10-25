@@ -57,7 +57,8 @@ export default function Sidebar() {
         </p>
         {menuItems.slice(0, 7).map((item) => {
           const Icon = item.icon;
-          const isActive = pathname === item.href || pathname.startsWith(`${item.href}/`);
+          const path = pathname || "";
+          const isActive = path === item.href || path.startsWith(`${item.href}/`);
           return (
             <Link
               key={item.href}
@@ -81,7 +82,8 @@ export default function Sidebar() {
         </p>
         {menuItems.slice(7).map((item) => {
           const Icon = item.icon;
-          const isActive = pathname === item.href || pathname.startsWith(`${item.href}/`);
+          const path = pathname || "";
+          const isActive = path === item.href || path.startsWith(`${item.href}/`);
           return (
             <Link
               key={item.href}

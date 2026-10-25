@@ -4,7 +4,7 @@ import { FormEvent, useCallback, useEffect, useState } from "react";
 import DashboardLayout from "@/components/layout/DashboardLayout";
 import { Shield, Plus, Ban, CheckCircle, Trash2, RefreshCw, UserPlus } from "lucide-react";
 import { useAuthStore } from "@/store/authStore";
-import { parseApiJson } from "@/lib/parseApiJson";
+import { asErrorMessage, parseApiJson } from "@/lib/parseApiJson";
 
 type AdminRow = {
   id: string;
@@ -44,9 +44,9 @@ export default function AdminUsersPage() {
         headers: authHeaders(token),
         cache: "no-store",
       });
-      const payload = await parseApiJson(response);
+      const payload = await parseApiJson<{ success?: boolean; message?: string; data?: AdminRow[] }>(response);
       if (!response.ok || !payload?.success) {
-        throw new Error(payload?.message || "Failed to load admin users");
+        throw new Error(asErrorMessage(payload?.message, "Failed to load admin users"));
       }
       setAdmins(payload.data || []);
     } catch (err) {
@@ -72,9 +72,9 @@ export default function AdminUsersPage() {
         headers: authHeaders(token),
         body: JSON.stringify({ name, email, password, role: "admin" }),
       });
-      const payload = await parseApiJson(response);
+      const payload = await parseApiJson<{ success?: boolean; message?: string; data?: AdminRow }>(response);
       if (!response.ok || !payload?.success) {
-        throw new Error(payload?.message || "Failed to create admin account");
+        throw new Error(asErrorMessage(payload?.message, "Failed to create admin account"));
       }
       setName("");
       setEmail("");
@@ -98,9 +98,9 @@ export default function AdminUsersPage() {
         method: "PATCH",
         headers: authHeaders(token),
       });
-      const payload = await parseApiJson(response);
+      const payload = await parseApiJson<{ success?: boolean; message?: string }>(response);
       if (!response.ok || !payload?.success) {
-        throw new Error(payload?.message || "Failed to update admin");
+        throw new Error(asErrorMessage(payload?.message, "Failed to update admin"));
       }
       await loadAdmins();
     } catch (err) {
@@ -117,9 +117,9 @@ export default function AdminUsersPage() {
         method: "DELETE",
         headers: authHeaders(token),
       });
-      const payload = await parseApiJson(response);
+      const payload = await parseApiJson<{ success?: boolean; message?: string }>(response);
       if (!response.ok || !payload?.success) {
-        throw new Error(payload?.message || "Failed to delete admin");
+        throw new Error(asErrorMessage(payload?.message, "Failed to delete admin"));
       }
       setSaved("Admin account deleted");
       await loadAdmins();

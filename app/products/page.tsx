@@ -1,6 +1,23 @@
 "use client";
 
-import { parseApiJson } from "@/lib/parseApiJson";
+import { asErrorMessage, parseApiJson } from "@/lib/parseApiJson";
+
+type ImportResult = {
+  success: boolean;
+  message: string;
+  totalParsed?: number;
+  importedCount?: number;
+  failedCount?: number;
+  importedProducts?: Array<{
+    _id: string;
+    title: string;
+    sku?: string;
+    category: string;
+    salePrice: number;
+    status: string;
+  }>;
+  errors?: Array<{ row: number; title: string; error: string }>;
+};
 
 import { useEffect, useMemo, useState } from "react";
 import DashboardLayout from "@/components/layout/DashboardLayout";
@@ -227,22 +244,7 @@ export default function ProductsPage() {
   const [showImportModal, setShowImportModal] = useState(false);
   const [importFile, setImportFile] = useState<File | null>(null);
   const [importing, setImporting] = useState(false);
-  const [importResult, setImportResult] = useState<{
-    success: boolean;
-    message: string;
-    totalParsed?: number;
-    importedCount?: number;
-    failedCount?: number;
-    importedProducts?: Array<{
-      _id: string;
-      title: string;
-      sku?: string;
-      category: string;
-      salePrice: number;
-      status: string;
-    }>;
-    errors?: Array<{ row: number; title: string; error: string }>;
-  } | null>(null);
+  const [importResult, setImportResult] = useState<ImportResult | null>(null);
   const [importError, setImportError] = useState("");
 
   const handleDownloadTemplate = () => {
@@ -272,9 +274,9 @@ export default function ProductsPage() {
         },
       });
 
-      const data = await parseApiJson(res);
+      const data = await parseApiJson<ImportResult>(res);
       if (!res.ok || !data.success) {
-        throw new Error(data.message || "Failed to import products from file.");
+        throw new Error(asErrorMessage(data.message, "Failed to import products from file."));
       }
 
       setImportResult(data);
@@ -316,13 +318,21 @@ export default function ProductsPage() {
         fetch("/api/products/audits?limit=25"),
       ]);
 
-      const productsPayload = await parseApiJson(productsRes);
-      const statsPayload = await parseApiJson(statsRes);
-      const metaPayload = await parseApiJson(metaRes);
-      const auditPayload = await parseApiJson(auditRes);
+      const productsPayload = await parseApiJson<{
+        success?: boolean;
+        message?: string;
+        data?: Product[];
+        pagination?: { total: number; page: number; limit: number; pages: number };
+      }>(productsRes);
+      const statsPayload = await parseApiJson<{ success?: boolean; data?: Record<string, unknown> }>(statsRes);
+      const metaPayload = await parseApiJson<{
+        success?: boolean;
+        data?: { categories?: string[]; intentions?: string[]; remedies?: RemedyOption[] };
+      }>(metaRes);
+      const auditPayload = await parseApiJson<{ success?: boolean; data?: AuditItem[] }>(auditRes);
 
       if (!productsRes.ok || !productsPayload?.success) {
-        throw new Error(productsPayload?.message || "Failed to load products from API");
+        throw new Error(asErrorMessage(productsPayload?.message, "Failed to load products from API"));
       }
 
       setProducts(productsPayload.data || []);
@@ -334,14 +344,14 @@ export default function ProductsPage() {
           pages: 1,
         }
       );
-      if (statsPayload?.success) setStats(statsPayload.data || {});
+      if (statsPayload?.success) setStats((statsPayload.data || {}) as Record<string, number>);
       if (metaPayload?.success) {
-        const raw = metaPayload.data.categories || [];
+        const raw = metaPayload.data?.categories || [];
         const filtered = raw.filter((c: string) => ALLOWED_CATEGORIES.includes(c));
         setMeta({
           categories: filtered.length ? filtered : ALLOWED_CATEGORIES,
-          intentions: metaPayload.data.intentions || [],
-          remedies: metaPayload.data.remedies || [],
+          intentions: metaPayload.data?.intentions || [],
+          remedies: metaPayload.data?.remedies || [],
         });
       }
       if (auditPayload?.success) setAudits(auditPayload.data || []);
@@ -474,14 +484,19 @@ export default function ProductsPage() {
         },
         body,
       });
-      const data = await parseApiJson(response);
+      const data = await parseApiJson<{
+        success?: boolean;
+        message?: string;
+        data?: Product | ProductImage[];
+      }>(response);
       if (!response.ok || !data.success) {
-        throw new Error(data.message || "Image upload failed");
+        throw new Error(asErrorMessage(data.message, "Image upload failed"));
       }
 
       if (editingId && data.data && !Array.isArray(data.data)) {
         // Product document returned from /:id/images
-        setForm((prev) => ({ ...prev, images: data.data.images || [] }));
+        const productDoc = data.data;
+        setForm((prev) => ({ ...prev, images: productDoc.images || [] }));
         await loadAll();
         return;
       }
@@ -526,8 +541,8 @@ export default function ProductsPage() {
         headers: actorHeaders,
         body: JSON.stringify(payload),
       });
-      const data = await parseApiJson(response);
-      if (!response.ok || !data.success) throw new Error(data.message || "Save failed");
+      const data = await parseApiJson<{ success?: boolean; message?: string }>(response);
+      if (!response.ok || !data.success) throw new Error(asErrorMessage(data.message, "Save failed"));
       setShowForm(false);
       setSelected([]);
       await loadAll();
@@ -544,9 +559,9 @@ export default function ProductsPage() {
       headers: actorHeaders,
       body: JSON.stringify({ status, actor: user?.name || "Admin" }),
     });
-    const data = await parseApiJson(response);
+    const data = await parseApiJson<{ success?: boolean; message?: string }>(response);
     if (!response.ok || !data.success) {
-      setError(data.message || "Status update failed");
+      setError(asErrorMessage(data.message, "Status update failed"));
       return;
     }
     await loadAll();
@@ -559,9 +574,9 @@ export default function ProductsPage() {
       headers: actorHeaders,
       body: JSON.stringify({ ids: selected, status, actor: user?.name || "Admin" }),
     });
-    const data = await parseApiJson(response);
+    const data = await parseApiJson<{ success?: boolean; message?: string }>(response);
     if (!response.ok || !data.success) {
-      setError(data.message || "Bulk update failed");
+      setError(asErrorMessage(data.message, "Bulk update failed"));
       return;
     }
     setSelected([]);
@@ -574,9 +589,9 @@ export default function ProductsPage() {
       method: "DELETE",
       headers: actorHeaders,
     });
-    const data = await parseApiJson(response);
+    const data = await parseApiJson<{ success?: boolean; message?: string }>(response);
     if (!response.ok || !data.success) {
-      setError(data.message || "Delete failed");
+      setError(asErrorMessage(data.message, "Delete failed"));
       return;
     }
     await loadAll();
@@ -594,13 +609,13 @@ export default function ProductsPage() {
       },
       body,
     });
-    const data = await parseApiJson(response);
+    const data = await parseApiJson<{ success?: boolean; message?: string; data?: Product }>(response);
     if (!response.ok || !data.success) {
-      setError(data.message || "Image upload failed");
+      setError(asErrorMessage(data.message, "Image upload failed"));
       return;
     }
     await loadAll();
-    if (editingId === id) openEdit(data.data);
+    if (editingId === id && data.data) openEdit(data.data);
   };
 
   const toggleSelect = (id: string) => {

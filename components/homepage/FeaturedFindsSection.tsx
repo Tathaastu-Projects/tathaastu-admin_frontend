@@ -122,14 +122,15 @@ export function FeaturedFindsSection() {
       }
       const response = await fetch("/api/store/admin/featured-finds", { method: "PUT", body });
       const payload = await parseApiJson<{ success?: boolean; message?: string; data?: Featured }>(response);
-      if (!response.ok || !payload?.success) {
+      if (!response.ok || !payload?.success || !payload.data) {
         throw new Error(payload?.message || "Failed to save");
       }
-      const next = { ...EMPTY, ...payload.data, points: payload.data.points || EMPTY.points };
+      const savedData = payload.data;
+      const next = { ...EMPTY, ...savedData, points: savedData.points || EMPTY.points };
       setForm(next);
       setPointsText(next.points.join(" | "));
-      setVideoPreview(payload.data.videoUrl || "");
-      setImagePreview(payload.data.imageUrl || "");
+      setVideoPreview(savedData.videoUrl || "");
+      setImagePreview(savedData.imageUrl || "");
       setVideoFile(null);
       setImageFile(null);
       setSaved("Karungali section updated");
