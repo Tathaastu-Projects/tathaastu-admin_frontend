@@ -1,5 +1,7 @@
 "use client";
 
+import { parseApiJson } from "@/lib/parseApiJson";
+
 import { useEffect, useMemo, useState } from "react";
 import DashboardLayout from "@/components/layout/DashboardLayout";
 import { useAuthStore } from "@/store/authStore";
@@ -270,7 +272,7 @@ export default function ProductsPage() {
         },
       });
 
-      const data = await res.json();
+      const data = await parseApiJson(res);
       if (!res.ok || !data.success) {
         throw new Error(data.message || "Failed to import products from file.");
       }
@@ -314,10 +316,10 @@ export default function ProductsPage() {
         fetch("/api/products/audits?limit=25"),
       ]);
 
-      const productsPayload = await productsRes.json();
-      const statsPayload = await statsRes.json();
-      const metaPayload = await metaRes.json();
-      const auditPayload = await auditRes.json();
+      const productsPayload = await parseApiJson(productsRes);
+      const statsPayload = await parseApiJson(statsRes);
+      const metaPayload = await parseApiJson(metaRes);
+      const auditPayload = await parseApiJson(auditRes);
 
       if (!productsRes.ok || !productsPayload?.success) {
         throw new Error(productsPayload?.message || "Failed to load products from API");
@@ -472,7 +474,7 @@ export default function ProductsPage() {
         },
         body,
       });
-      const data = await response.json();
+      const data = await parseApiJson(response);
       if (!response.ok || !data.success) {
         throw new Error(data.message || "Image upload failed");
       }
@@ -524,7 +526,7 @@ export default function ProductsPage() {
         headers: actorHeaders,
         body: JSON.stringify(payload),
       });
-      const data = await response.json();
+      const data = await parseApiJson(response);
       if (!response.ok || !data.success) throw new Error(data.message || "Save failed");
       setShowForm(false);
       setSelected([]);
@@ -542,7 +544,7 @@ export default function ProductsPage() {
       headers: actorHeaders,
       body: JSON.stringify({ status, actor: user?.name || "Admin" }),
     });
-    const data = await response.json();
+    const data = await parseApiJson(response);
     if (!response.ok || !data.success) {
       setError(data.message || "Status update failed");
       return;
@@ -557,7 +559,7 @@ export default function ProductsPage() {
       headers: actorHeaders,
       body: JSON.stringify({ ids: selected, status, actor: user?.name || "Admin" }),
     });
-    const data = await response.json();
+    const data = await parseApiJson(response);
     if (!response.ok || !data.success) {
       setError(data.message || "Bulk update failed");
       return;
@@ -572,7 +574,7 @@ export default function ProductsPage() {
       method: "DELETE",
       headers: actorHeaders,
     });
-    const data = await response.json();
+    const data = await parseApiJson(response);
     if (!response.ok || !data.success) {
       setError(data.message || "Delete failed");
       return;
@@ -592,7 +594,7 @@ export default function ProductsPage() {
       },
       body,
     });
-    const data = await response.json();
+    const data = await parseApiJson(response);
     if (!response.ok || !data.success) {
       setError(data.message || "Image upload failed");
       return;

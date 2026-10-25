@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { HelpCircle, Plus, Trash2 } from "lucide-react";
+import { parseApiJson } from "@/lib/parseApiJson";
 
 type Faq = { question: string; answer: string };
 
@@ -17,7 +18,7 @@ export function HomeFaqsSection() {
     (async () => {
       try {
         const response = await fetch("/api/store/admin/faqs");
-        const payload = await response.json();
+        const payload = await parseApiJson(response);
         if (!response.ok || !payload?.success) {
           throw new Error(payload?.message || "Failed to load FAQs");
         }
@@ -55,7 +56,7 @@ export function HomeFaqsSection() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ faqs: clean }),
       });
-      const payload = await response.json();
+      const payload = await parseApiJson(response);
       if (!response.ok || !payload?.success) {
         throw new Error(payload?.message || "Failed to save FAQs");
       }
@@ -81,7 +82,7 @@ export function HomeFaqsSection() {
       const response = await fetch(`/api/store/admin/faqs/${index}`, {
         method: "DELETE",
       });
-      const payload = await response.json();
+      const payload = await parseApiJson(response);
       if (!response.ok || !payload?.success) {
         await save(next);
         return;
@@ -104,7 +105,7 @@ export function HomeFaqsSection() {
     setSaved("");
     try {
       const response = await fetch("/api/store/admin/faqs", { method: "DELETE" });
-      const payload = await response.json();
+      const payload = await parseApiJson(response);
       if (!response.ok || !payload?.success) {
         throw new Error(payload?.message || "Failed to clear FAQs");
       }

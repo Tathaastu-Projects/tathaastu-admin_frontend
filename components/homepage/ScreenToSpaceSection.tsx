@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { parseApiJson } from "@/lib/parseApiJson";
 import {
   Film,
   Plus,
@@ -69,7 +70,7 @@ export function ScreenToSpaceSection() {
           fetch("/api/products?limit=100"),
         ]);
 
-        const sectionData = await resSection.json();
+        const sectionData = await parseApiJson(resSection);
         if (resSection.ok && sectionData.success && sectionData.data) {
           if (!cancelled) {
             setTitle(sectionData.data.title || "from screen to space, seamlessly");
@@ -79,7 +80,7 @@ export function ScreenToSpaceSection() {
           }
         }
 
-        const productsData = await resProducts.json();
+        const productsData = await parseApiJson(resProducts);
         if (resProducts.ok && productsData.products) {
           if (!cancelled) {
             setProducts(
@@ -180,7 +181,11 @@ export function ScreenToSpaceSection() {
         body: formData,
       });
 
-      const data = await res.json();
+      const data = await parseApiJson<{
+        success?: boolean;
+        message?: string;
+        data?: { videoUrl?: string; imageUrl?: string; productImage?: string };
+      }>(res);
       if (!res.ok || !data.success) {
         throw new Error(data.message || "Upload failed");
       }
@@ -218,7 +223,7 @@ export function ScreenToSpaceSection() {
         body: JSON.stringify(payload),
       });
 
-      const data = await res.json();
+      const data = await parseApiJson(res);
       if (!res.ok || !data.success) {
         throw new Error(data.message || "Failed to save");
       }

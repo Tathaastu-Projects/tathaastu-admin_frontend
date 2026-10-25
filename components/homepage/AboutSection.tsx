@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { Flower2, Trash2 } from "lucide-react";
+import { parseApiJson } from "@/lib/parseApiJson";
 
 type Feature = {
   id: string;
@@ -29,12 +30,7 @@ type PointDraft = {
 };
 
 async function readPayload(response: Response) {
-  const text = await response.text();
-  try {
-    return JSON.parse(text);
-  } catch {
-    throw new Error(text.slice(0, 180) || "Save failed");
-  }
+  return parseApiJson(response);
 }
 
 function previewSrc(url?: string) {
@@ -133,7 +129,7 @@ export function AboutSection() {
     setError("");
     try {
       const response = await fetch("/api/store/admin/about");
-      const payload = await response.json();
+      const payload = await parseApiJson(response);
       if (!response.ok || !payload?.success) {
         throw new Error(payload?.message || "Failed to load about section");
       }

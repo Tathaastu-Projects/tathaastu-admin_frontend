@@ -39,7 +39,26 @@ export const useAuthStore = create<AuthState>()(
             password: String(password || ""),
           }),
         });
-        const payload = await response.json().catch(() => ({}));
+        type LoginPayload = {
+          success?: boolean;
+          message?: string;
+          token?: string;
+          user?: { id: string; name?: string; email: string; role?: string; isDefault?: boolean };
+          data?: {
+            token?: string;
+            user?: { id: string; name?: string; email: string; role?: string; isDefault?: boolean };
+          };
+        };
+        let payload: LoginPayload = {};
+        try {
+          const { parseApiJson } = await import("@/lib/parseApiJson");
+          payload = await parseApiJson<LoginPayload>(response);
+        } catch (err) {
+          if (!response.ok) {
+            throw new Error(err instanceof Error ? err.message : "Login failed");
+          }
+          throw err;
+        }
         if (!response.ok || !payload?.success) {
           throw new Error(payload?.message || "Invalid email or password");
         }

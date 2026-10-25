@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { Plus, Quote, Trash2 } from "lucide-react";
+import { parseApiJson } from "@/lib/parseApiJson";
 
 type Item = {
   quote: string;
@@ -58,7 +59,7 @@ export function TestimonialsSection() {
     (async () => {
       try {
         const response = await fetch("/api/store/admin/testimonials");
-        const payload = await response.json();
+        const payload = await parseApiJson(response);
         if (!response.ok || !payload?.success) {
           throw new Error(payload?.message || "Failed to load testimonials");
         }
@@ -112,7 +113,7 @@ export function TestimonialsSection() {
         if (item.file) body.set(`image_${index}`, item.file);
       });
       const response = await fetch("/api/store/admin/testimonials", { method: "PUT", body });
-      const payload = await response.json();
+      const payload = await parseApiJson(response);
       if (!response.ok || !payload?.success) {
         throw new Error(payload?.message || "Failed to save testimonials");
       }
@@ -147,7 +148,7 @@ export function TestimonialsSection() {
     setItems(next);
     try {
       const res = await fetch(`/api/store/admin/testimonials/${index}`, { method: "DELETE" });
-      const payload = await res.json();
+      const payload = await parseApiJson(res);
       if (res.ok && payload.success && Array.isArray(payload.data)) {
         setItems(payload.data.map((row: SavedItem) => toItem(row)));
         setSaved("Testimonial deleted");

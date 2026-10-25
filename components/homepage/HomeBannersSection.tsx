@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { ImageIcon, Pencil, Plus, Trash2, X } from "lucide-react";
+import { parseApiJson } from "@/lib/parseApiJson";
 
 type CategoryOption = {
   id: string;
@@ -62,7 +63,7 @@ export function HomeBannersSection() {
     setError("");
     try {
       const response = await fetch("/api/store/admin/home-banners");
-      const payload = await response.json();
+      const payload = await parseApiJson(response);
       if (!response.ok || !payload?.success) {
         throw new Error(payload?.message || "Failed to load banners");
       }
@@ -154,7 +155,7 @@ export function HomeBannersSection() {
         editingId ? `/api/store/admin/home-banners/${editingId}` : "/api/store/admin/home-banners",
         { method: editingId ? "PUT" : "POST", body }
       );
-      const payload = await response.json();
+      const payload = await parseApiJson(response);
       if (!response.ok || !payload?.success) {
         throw new Error(payload?.message || "Failed to save banner");
       }
@@ -178,7 +179,7 @@ export function HomeBannersSection() {
       const body = new FormData();
       body.set("image", logoFile);
       const response = await fetch("/api/store/admin/logo", { method: "PUT", body });
-      const payload = await response.json();
+      const payload = await parseApiJson(response);
       if (!response.ok || !payload?.success) {
         throw new Error(payload?.message || "Failed to update logo");
       }
@@ -197,7 +198,7 @@ export function HomeBannersSection() {
     setError("");
     try {
       const response = await fetch("/api/store/admin/logo", { method: "DELETE" });
-      const payload = await response.json();
+      const payload = await parseApiJson(response);
       if (!response.ok || !payload?.success) {
         throw new Error(payload?.message || "Failed to remove logo");
       }
@@ -217,7 +218,7 @@ export function HomeBannersSection() {
     setError("");
     try {
       const response = await fetch(`/api/store/admin/home-banners/${banner._id}`, { method: "DELETE" });
-      const payload = await response.json();
+      const payload = await parseApiJson(response);
       if (!response.ok || !payload?.success) {
         throw new Error(payload?.message || "Failed to delete banner");
       }

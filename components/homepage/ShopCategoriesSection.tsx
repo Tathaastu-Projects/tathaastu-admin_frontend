@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { LayoutGrid, Trash2 } from "lucide-react";
+import { parseApiJson } from "@/lib/parseApiJson";
 
 type Tile = {
   id: string;
@@ -36,7 +37,7 @@ export function ShopCategoriesSection() {
     setError("");
     try {
       const response = await fetch("/api/store/admin/category-tiles");
-      const payload = await response.json();
+      const payload = await parseApiJson(response);
       if (!response.ok || !payload?.success) {
         throw new Error(payload?.message || "Failed to load categories");
       }
@@ -74,7 +75,7 @@ export function ShopCategoriesSection() {
         method: "PUT",
         body,
       });
-      const payload = await response.json();
+      const payload = await parseApiJson(response);
       if (!response.ok || !payload?.success) {
         throw new Error(payload?.message || "Failed to update category");
       }
@@ -97,7 +98,7 @@ export function ShopCategoriesSection() {
       const response = await fetch(`/api/store/admin/category-tiles/${tile.id}/image`, {
         method: "DELETE",
       });
-      const payload = await response.json();
+      const payload = await parseApiJson(response);
       if (!response.ok || !payload?.success) {
         throw new Error(payload?.message || "Failed to reset photo");
       }

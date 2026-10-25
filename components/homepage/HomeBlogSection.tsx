@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { BookOpen, Plus, Trash2 } from "lucide-react";
+import { parseApiJson } from "@/lib/parseApiJson";
 
 type Item = {
   _id: string;
@@ -57,7 +58,7 @@ export function HomeBlogSection() {
 
   const load = async () => {
     const response = await fetch("/api/store/admin/home-blogs");
-    const payload = await response.json();
+    const payload = await parseApiJson(response);
     if (!response.ok || !payload?.success) {
       throw new Error(payload?.message || "Failed to load blog cards");
     }
@@ -99,7 +100,7 @@ export function HomeBlogSection() {
         if (item.videoFile) body.set(`video_${index}`, item.videoFile);
       });
       const response = await fetch("/api/store/admin/home-blogs", { method: "PUT", body });
-      const payload = await response.json();
+      const payload = await parseApiJson(response);
       if (!response.ok || !payload?.success) {
         throw new Error(payload?.message || "Failed to save blog cards");
       }
@@ -135,7 +136,7 @@ export function HomeBlogSection() {
           playbackUrl: "",
         }),
       });
-      const payload = await response.json();
+      const payload = await parseApiJson(response);
       if (!response.ok || !payload?.success) {
         throw new Error(payload?.message || "Failed to create blog post");
       }
@@ -158,7 +159,7 @@ export function HomeBlogSection() {
     );
     try {
       const res = await fetch(`/api/store/admin/home-blogs/${id}/image`, { method: "DELETE" });
-      const payload = await res.json();
+      const payload = await parseApiJson(res);
       if (res.ok && payload.success) setSaved("Blog photo deleted");
     } catch (_err) {
       // Local state already updated
@@ -176,7 +177,7 @@ export function HomeBlogSection() {
     );
     try {
       const res = await fetch(`/api/store/admin/home-blogs/${id}/video`, { method: "DELETE" });
-      const payload = await res.json();
+      const payload = await parseApiJson(res);
       if (res.ok && payload.success) setSaved("Blog video deleted");
     } catch (_err) {
       // Local state already updated
@@ -190,7 +191,7 @@ export function HomeBlogSection() {
     setItems((prev) => prev.filter((b) => b._id !== id));
     try {
       const res = await fetch(`/api/store/admin/home-blogs/${id}`, { method: "DELETE" });
-      const payload = await res.json();
+      const payload = await parseApiJson(res);
       if (res.ok && payload.success) setSaved(`Blog "${name}" deleted`);
     } catch (_err) {
       // Local state already updated

@@ -4,6 +4,7 @@ import { FormEvent, useCallback, useEffect, useState } from "react";
 import DashboardLayout from "@/components/layout/DashboardLayout";
 import { Shield, Plus, Ban, CheckCircle, Trash2, RefreshCw, UserPlus } from "lucide-react";
 import { useAuthStore } from "@/store/authStore";
+import { parseApiJson } from "@/lib/parseApiJson";
 
 type AdminRow = {
   id: string;
@@ -43,7 +44,7 @@ export default function AdminUsersPage() {
         headers: authHeaders(token),
         cache: "no-store",
       });
-      const payload = await response.json();
+      const payload = await parseApiJson(response);
       if (!response.ok || !payload?.success) {
         throw new Error(payload?.message || "Failed to load admin users");
       }
@@ -71,7 +72,7 @@ export default function AdminUsersPage() {
         headers: authHeaders(token),
         body: JSON.stringify({ name, email, password, role: "admin" }),
       });
-      const payload = await response.json();
+      const payload = await parseApiJson(response);
       if (!response.ok || !payload?.success) {
         throw new Error(payload?.message || "Failed to create admin account");
       }
@@ -97,7 +98,7 @@ export default function AdminUsersPage() {
         method: "PATCH",
         headers: authHeaders(token),
       });
-      const payload = await response.json();
+      const payload = await parseApiJson(response);
       if (!response.ok || !payload?.success) {
         throw new Error(payload?.message || "Failed to update admin");
       }
@@ -116,7 +117,7 @@ export default function AdminUsersPage() {
         method: "DELETE",
         headers: authHeaders(token),
       });
-      const payload = await response.json();
+      const payload = await parseApiJson(response);
       if (!response.ok || !payload?.success) {
         throw new Error(payload?.message || "Failed to delete admin");
       }

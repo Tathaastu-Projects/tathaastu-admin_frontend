@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { Clapperboard, Trash2 } from "lucide-react";
+import { parseApiJson } from "@/lib/parseApiJson";
 
 type Featured = {
   eyebrow: string;
@@ -71,7 +72,7 @@ export function FeaturedFindsSection() {
     (async () => {
       try {
         const response = await fetch("/api/store/admin/featured-finds");
-        const payload = await response.json();
+        const payload = await parseApiJson<{ success?: boolean; message?: string; data?: Featured }>(response);
         if (!response.ok || !payload?.success) {
           throw new Error(payload?.message || "Failed to load this section");
         }
@@ -120,7 +121,7 @@ export function FeaturedFindsSection() {
         body.set("imageUrl", form.imageUrl.trim());
       }
       const response = await fetch("/api/store/admin/featured-finds", { method: "PUT", body });
-      const payload = await response.json();
+      const payload = await parseApiJson<{ success?: boolean; message?: string; data?: Featured }>(response);
       if (!response.ok || !payload?.success) {
         throw new Error(payload?.message || "Failed to save");
       }
@@ -147,7 +148,7 @@ export function FeaturedFindsSection() {
     setSaved("");
     try {
       const response = await fetch("/api/store/admin/featured-finds/video", { method: "DELETE" });
-      const payload = await response.json();
+      const payload = await parseApiJson<{ success?: boolean; message?: string }>(response);
       if (!response.ok || !payload?.success) {
         throw new Error(payload?.message || "Failed to delete video");
       }
@@ -170,7 +171,7 @@ export function FeaturedFindsSection() {
     setSaved("");
     try {
       const response = await fetch("/api/store/admin/featured-finds/image", { method: "DELETE" });
-      const payload = await response.json();
+      const payload = await parseApiJson<{ success?: boolean; message?: string }>(response);
       if (!response.ok || !payload?.success) {
         throw new Error(payload?.message || "Failed to delete photo");
       }
@@ -203,7 +204,7 @@ export function FeaturedFindsSection() {
         </div>
         <h2 className="font-serif text-3xl font-semibold text-brand-deepMaroon">Featured finds</h2>
         <p className="mt-2 max-w-2xl text-sm text-stone-600">
-          This block sits just above Testimonials. The first frame is a video (upload or paste live URL). The second frame is a photo (upload or paste live URL).
+          This block sits just above Testimonials. Upload a video (MP4/WebM, max ~120&nbsp;MB — compressed on the server) or paste a live URL, plus a photo for the second frame.
         </p>
       </div>
 

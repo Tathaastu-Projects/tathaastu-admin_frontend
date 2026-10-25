@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { FolderKanban, ImageIcon, Pencil, Plus, Trash2, X, ExternalLink } from "lucide-react";
+import { parseApiJson } from "@/lib/parseApiJson";
 
 type CategoryOption = {
   id: string;
@@ -74,7 +75,7 @@ export function CategoryBannersSection() {
     setError("");
     try {
       const response = await fetch("/api/store/admin/category-banners");
-      const payload = await response.json();
+      const payload = await parseApiJson(response);
       if (!response.ok || !payload?.success) {
         throw new Error(payload?.message || "Failed to load category banners");
       }
@@ -163,7 +164,7 @@ export function CategoryBannersSection() {
         editingId ? `/api/store/admin/category-banners/${editingId}` : "/api/store/admin/category-banners",
         { method: editingId ? "PUT" : "POST", body }
       );
-      const payload = await response.json();
+      const payload = await parseApiJson(response);
       if (!response.ok || !payload?.success) {
         throw new Error(payload?.message || "Failed to save category banner");
       }
@@ -183,7 +184,7 @@ export function CategoryBannersSection() {
     setError("");
     try {
       const response = await fetch(`/api/store/admin/category-banners/${banner._id}`, { method: "DELETE" });
-      const payload = await response.json();
+      const payload = await parseApiJson(response);
       if (!response.ok || !payload?.success) {
         throw new Error(payload?.message || "Failed to delete category banner");
       }

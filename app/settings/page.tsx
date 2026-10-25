@@ -5,6 +5,7 @@ import Link from "next/link";
 import DashboardLayout from "@/components/layout/DashboardLayout";
 import { User, Mail, Shield, Plus, Ban, CheckCircle, Trash2, RefreshCw } from "lucide-react";
 import { useAuthStore } from "@/store/authStore";
+import { parseApiJson } from "@/lib/parseApiJson";
 
 type AdminRow = {
   id: string;
@@ -45,7 +46,7 @@ export default function SettingsPage() {
         headers: authHeaders(token),
         cache: "no-store",
       });
-      const payload = await response.json();
+      const payload = await parseApiJson(response);
       if (!response.ok || !payload?.success) {
         throw new Error(payload?.message || "Failed to load admin users");
       }
@@ -73,7 +74,7 @@ export default function SettingsPage() {
         headers: authHeaders(token),
         body: JSON.stringify({ name, email, password, role: "admin" }),
       });
-      const payload = await response.json();
+      const payload = await parseApiJson(response);
       if (!response.ok || !payload?.success) {
         throw new Error(payload?.message || "Failed to create admin");
       }
@@ -97,7 +98,7 @@ export default function SettingsPage() {
         method: "PATCH",
         headers: authHeaders(token),
       });
-      const payload = await response.json();
+      const payload = await parseApiJson(response);
       if (!response.ok || !payload?.success) {
         throw new Error(payload?.message || "Failed to update admin");
       }
@@ -116,7 +117,7 @@ export default function SettingsPage() {
         method: "DELETE",
         headers: authHeaders(token),
       });
-      const payload = await response.json();
+      const payload = await parseApiJson(response);
       if (!response.ok || !payload?.success) {
         throw new Error(payload?.message || "Failed to delete admin");
       }
