@@ -499,14 +499,19 @@ export default function ProductsPage() {
         ? `/api/products/${editingId}/images`
         : "/api/products/upload-images";
 
-      let response: Response | null = null;
+      let data: {
+        success?: boolean;
+        message?: string;
+        data?: Product | ProductImage[];
+      } | null = null;
       let lastFail = "";
+      let lastOk = false;
       // Fresh FormData each try — required when 3 Admin devices hit the lock together
       for (let attempt = 0; attempt < 4; attempt += 1) {
         const body = new FormData();
         Array.from(files).forEach((file) => body.append("images", file));
         if (form.title.trim()) body.set("alt", form.title.trim());
-        response = await fetch(endpoint, {
+        const response = await fetch(endpoint, {
           method: "POST",
           headers: {
             "x-actor-name": user?.name || "Admin",
@@ -514,31 +519,25 @@ export default function ProductsPage() {
           },
           body,
         });
-        if (response.ok) break;
+        data = await parseApiJson<{
+          success?: boolean;
+          message?: string;
+          data?: Product | ProductImage[];
+        }>(response);
+        lastOk = response.ok;
+        if (response.ok && data.success) break;
         if (response.status === 409 || response.status === 502 || response.status === 503) {
-          try {
-            const errData = await parseApiJson<{ message?: string }>(response);
-            lastFail = asErrorMessage(
-              errData.message,
-              "Another device is saving right now. Retrying…"
-            );
-          } catch {
-            lastFail = "Another device is saving right now. Retrying…";
-          }
+          lastFail = asErrorMessage(
+            data.message,
+            "Another device is saving right now. Retrying…"
+          );
           await new Promise((r) => setTimeout(r, 800 + attempt * 500));
           continue;
         }
         break;
       }
-      if (!response) throw new Error(lastFail || "Image upload failed");
-
-      const data = await parseApiJson<{
-        success?: boolean;
-        message?: string;
-        data?: Product | ProductImage[];
-      }>(response);
-      if (!response.ok || !data.success) {
-        throw new Error(asErrorMessage(data.message, lastFail || "Image upload failed"));
+      if (!data || !lastOk || !data.success) {
+        throw new Error(asErrorMessage(data?.message, lastFail || "Image upload failed"));
       }
 
       if (editingId && data.data && !Array.isArray(data.data)) {
