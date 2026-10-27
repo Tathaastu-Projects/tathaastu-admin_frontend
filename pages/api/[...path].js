@@ -17,10 +17,28 @@ export const config = {
 
 const PROXY_TIMEOUT_MS = 5 * 60 * 1000; // 5 minutes (video compress + upload)
 
+const httpAgent = new http.Agent({ keepAlive: true, maxSockets: 32 });
+const httpsAgent = new https.Agent({ keepAlive: true, maxSockets: 32 });
+
 function backendBase() {
   const raw = String(process.env.BACKEND_URL || "").trim().replace(/\/$/, "");
   if (!raw) throw new Error("BACKEND_URL is missing");
   return new URL(raw);
+}
+
+function sendJsonError(res, status, message) {
+  if (res.headersSent) {
+    try {
+      res.end();
+    } catch (_e) {
+      /* ignore */
+    }
+    return;
+  }
+  res.statusCode = status;
+  res.setHeader("Content-Type", "application/json; charset=utf-8");
+  res.setHeader("Cache-Control", "no-store");
+  res.end(JSON.stringify({ success: false, message }));
 }
 
 export default function handler(req, res) {
@@ -28,7 +46,7 @@ export default function handler(req, res) {
   try {
     target = backendBase();
   } catch (err) {
-    res.status(500).json({ success: false, message: err.message || "BACKEND_URL missing" });
+    sendJsonError(res, 500, err.message || "BACKEND_URL missing");
     return;
   }
 
@@ -37,6 +55,8 @@ export default function handler(req, res) {
 
   const headers = { ...req.headers, host: target.host };
   delete headers["accept-encoding"];
+  // Avoid stale keep-alive confusion through Next → backend
+  headers.connection = "keep-alive";
 
   const options = {
     protocol: target.protocol,
@@ -46,15 +66,23 @@ export default function handler(req, res) {
     method: req.method,
     headers,
     timeout: PROXY_TIMEOUT_MS,
+    agent: target.protocol === "https:" ? httpsAgent : httpAgent,
   };
 
   const lib = target.protocol === "https:" ? https : http;
   const proxyReq = lib.request(options, (proxyRes) => {
     const outHeaders = { ...proxyRes.headers };
-    // Avoid double-compression / length mismatches when piping
+    // Let Node recompute framing while piping
     delete outHeaders["transfer-encoding"];
-    res.writeHead(proxyRes.statusCode || 502, outHeaders);
-    proxyRes.pipe(res);
+    delete outHeaders["content-length"];
+    try {
+      res.writeHead(proxyRes.statusCode || 502, outHeaders);
+      proxyRes.pipe(res);
+    } catch (err) {
+      console.error("[api-proxy] writeHead/pipe", err.message);
+      proxyRes.resume();
+      sendJsonError(res, 502, "Proxy failed while reading API response. Please try again.");
+    }
   });
 
   proxyReq.on("timeout", () => {
@@ -63,17 +91,21 @@ export default function handler(req, res) {
 
   proxyReq.on("error", (err) => {
     console.error("[api-proxy]", err.message);
-    if (res.headersSent) {
-      res.end();
-      return;
-    }
-    res.status(502).json({
-      success: false,
-      message: `Backend unreachable (${err.message}). Check BACKEND_URL and that the API is running.`,
-    });
+    const msg =
+      /ECONNRESET|socket hang up/i.test(err.message)
+        ? "API connection reset while saving. Wait a few seconds and refresh — the product may already be saved."
+        : /ECONNREFUSED/i.test(err.message)
+          ? "API server is not reachable. Start the backend and try again."
+          : `Backend unreachable (${err.message}). Check BACKEND_URL and that the API is running.`;
+    sendJsonError(res, 502, msg);
   });
 
   req.on("aborted", () => {
+    proxyReq.destroy();
+  });
+
+  req.on("error", (err) => {
+    console.error("[api-proxy] client", err.message);
     proxyReq.destroy();
   });
 

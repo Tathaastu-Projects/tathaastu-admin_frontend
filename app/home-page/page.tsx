@@ -11,9 +11,30 @@ import { HomeBlogSection } from "@/components/homepage/HomeBlogSection";
 import { TestimonialsSection } from "@/components/homepage/TestimonialsSection";
 import { ScreenToSpaceSection } from "@/components/homepage/ScreenToSpaceSection";
 import { CategoryBannersSection } from "@/components/homepage/CategoryBannersSection";
+import { SeoSection } from "@/components/homepage/SeoSection";
+import { HeaderBarSection } from "@/components/homepage/HeaderBarSection";
+import { HeroTickerSection } from "@/components/homepage/HeroTickerSection";
 import { Home } from "lucide-react";
 
 const PORTIONS = [
+  {
+    id: "portion-seo",
+    number: "00",
+    title: "SEO (meta title & description)",
+    text: "Homepage and all main pages — Google / WhatsApp share title and description. Edit anytime from here.",
+  },
+  {
+    id: "portion-header-bar",
+    number: "00b",
+    title: "Top header bar",
+    text: "The thin strip at the very top of the website (Priyanka Singh / Lab-Certified / Shipping text).",
+  },
+  {
+    id: "portion-hero-ticker",
+    number: "00c",
+    title: "Hero ticker (auto-scroll)",
+    text: "Dark green scrolling strip under the hero — Astrology-Guided, Lab-Certified, Free Shipping, etc.",
+  },
   {
     id: "portion-banners",
     number: "01",
@@ -71,6 +92,9 @@ const PORTIONS = [
 ];
 
 const PANELS: Record<string, ReactNode> = {
+  "portion-seo": <SeoSection />,
+  "portion-header-bar": <HeaderBarSection />,
+  "portion-hero-ticker": <HeroTickerSection />,
   "portion-banners": <HomeBannersSection />,
   "portion-categories": <ShopCategoriesSection />,
   "portion-about": <AboutSection />,

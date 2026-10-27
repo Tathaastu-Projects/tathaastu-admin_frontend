@@ -15,8 +15,14 @@ function friendlyError(status: number, body: string): string | null {
   if (status === 504 || /gateway time-out|timed? ?out/i.test(body)) {
     return `Upload timed out. Please use a smaller file (under ${MAX_UPLOAD_MB} MB) and try again.`;
   }
+  if (/econnreset|backend unreachable|socket hang up|ECONNREFUSED/i.test(body)) {
+    return "Could not reach the API. Wait a few seconds and try again (do not refresh repeatedly).";
+  }
+  if (status === 409 || /another device|database is busy|db_busy/i.test(body)) {
+    return "Another device is saving right now. Wait 2 seconds and upload again.";
+  }
   if (status === 502 || status === 503) {
-    return "Server is busy or restarting. Please try again in a moment.";
+    return "API temporarily unavailable. Your last save may still have worked — refresh once after a few seconds.";
   }
   if (status === 401 || status === 403) {
     return "Please log in again and try.";
@@ -60,7 +66,11 @@ export async function parseApiJson<T = ApiJson>(response: Response): Promise<T> 
 
     const looksHtml = /^</.test(trimmed) || /<html/i.test(trimmed);
     if (looksHtml) {
-      // Most common cause in production: oversized video hitting proxy limit
+      if (response.status === 502 || response.status === 503) {
+        throw new Error(
+          "API temporarily unavailable. Your last save may still have worked — refresh once after a few seconds."
+        );
+      }
       throw new Error(`File too large. Please upload a file under ${MAX_UPLOAD_MB} MB.`);
     }
 
@@ -80,4 +90,39 @@ export async function fetchApiJson<T = ApiJson>(
   }
   const data = await parseApiJson<T>(response);
   return { response, data };
+}
+
+/** Automatic retry for transient proxy / multi-device lock blips. */
+export async function fetchWithRetry(
+  input: RequestInfo | URL,
+  init?: RequestInit,
+  retries = 1
+): Promise<Response> {
+  let lastErr: unknown;
+  for (let attempt = 0; attempt <= retries; attempt += 1) {
+    try {
+      const response = await fetch(input, init);
+      const retryable =
+        response.status === 409 ||
+        response.status === 502 ||
+        response.status === 503 ||
+        response.status === 504;
+      if (attempt < retries && retryable) {
+        // Body must be consumed or next attempt can hang on some browsers if we clone — skip body
+        try {
+          await response.arrayBuffer();
+        } catch {
+          /* ignore */
+        }
+        await new Promise((r) => setTimeout(r, 700 + attempt * 500));
+        continue;
+      }
+      return response;
+    } catch (err) {
+      lastErr = err;
+      if (attempt >= retries) break;
+      await new Promise((r) => setTimeout(r, 700 + attempt * 500));
+    }
+  }
+  throw lastErr instanceof Error ? lastErr : new Error("Could not connect. Please try again.");
 }

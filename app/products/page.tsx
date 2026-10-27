@@ -1,6 +1,6 @@
 "use client";
 
-import { asErrorMessage, parseApiJson } from "@/lib/parseApiJson";
+import { asErrorMessage, fetchWithRetry, parseApiJson } from "@/lib/parseApiJson";
 
 type ImportResult = {
   success: boolean;
@@ -311,25 +311,14 @@ export default function ProductsPage() {
       if (search.trim()) query.set("q", search.trim());
       if (lowStockOnly) query.set("lowStock", "true");
 
-      const [productsRes, statsRes, metaRes, auditRes] = await Promise.all([
-        fetch(`/api/products?${query.toString()}`),
-        fetch("/api/products/stats"),
-        fetch("/api/products/meta"),
-        fetch("/api/products/audits?limit=25"),
-      ]);
-
+      // Products list is required; stats/meta/audits are soft-fail so one blip does not empty the table
+      const productsRes = await fetchWithRetry(`/api/products?${query.toString()}`);
       const productsPayload = await parseApiJson<{
         success?: boolean;
         message?: string;
         data?: Product[];
         pagination?: { total: number; page: number; limit: number; pages: number };
       }>(productsRes);
-      const statsPayload = await parseApiJson<{ success?: boolean; data?: Record<string, unknown> }>(statsRes);
-      const metaPayload = await parseApiJson<{
-        success?: boolean;
-        data?: { categories?: string[]; intentions?: string[]; remedies?: RemedyOption[] };
-      }>(metaRes);
-      const auditPayload = await parseApiJson<{ success?: boolean; data?: AuditItem[] }>(auditRes);
 
       if (!productsRes.ok || !productsPayload?.success) {
         throw new Error(asErrorMessage(productsPayload?.message, "Failed to load products from API"));
@@ -344,20 +333,57 @@ export default function ProductsPage() {
           pages: 1,
         }
       );
-      if (statsPayload?.success) setStats((statsPayload.data || {}) as Record<string, number>);
-      if (metaPayload?.success) {
-        const raw = metaPayload.data?.categories || [];
-        const filtered = raw.filter((c: string) => ALLOWED_CATEGORIES.includes(c));
-        setMeta({
-          categories: filtered.length ? filtered : ALLOWED_CATEGORIES,
-          intentions: metaPayload.data?.intentions || [],
-          remedies: metaPayload.data?.remedies || [],
+
+      void Promise.all([
+        fetchWithRetry("/api/products/stats"),
+        fetchWithRetry("/api/products/meta"),
+        fetchWithRetry("/api/products/audits?limit=25"),
+      ])
+        .then(async ([statsRes, metaRes, auditRes]) => {
+          try {
+            const statsPayload = await parseApiJson<{ success?: boolean; data?: Record<string, unknown> }>(
+              statsRes
+            );
+            if (statsRes.ok && statsPayload?.success) {
+              setStats((statsPayload.data || {}) as Record<string, number>);
+            }
+          } catch {
+            /* keep previous stats */
+          }
+          try {
+            const metaPayload = await parseApiJson<{
+              success?: boolean;
+              data?: { categories?: string[]; intentions?: string[]; remedies?: RemedyOption[] };
+            }>(metaRes);
+            if (metaRes.ok && metaPayload?.success) {
+              const raw = metaPayload.data?.categories || [];
+              const filtered = raw.filter((c: string) => ALLOWED_CATEGORIES.includes(c));
+              setMeta({
+                categories: filtered.length ? filtered : ALLOWED_CATEGORIES,
+                intentions: metaPayload.data?.intentions || [],
+                remedies: metaPayload.data?.remedies || [],
+              });
+            }
+          } catch {
+            /* keep previous meta */
+          }
+          try {
+            const auditPayload = await parseApiJson<{ success?: boolean; data?: AuditItem[] }>(auditRes);
+            if (auditRes.ok && auditPayload?.success) setAudits(auditPayload.data || []);
+          } catch {
+            /* keep previous audits */
+          }
+        })
+        .catch(() => {
+          /* ignore secondary load failures */
         });
-      }
-      if (auditPayload?.success) setAudits(auditPayload.data || []);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to load products");
-      setProducts([]);
+      // Keep previous products on screen — clearing the table after a successful save was confusing
+      setError(
+        err instanceof Error
+          ? err.message
+          : "Failed to load products. Your data is still saved — try Refresh."
+      );
     } finally {
       setLoading(false);
     }
@@ -469,35 +495,58 @@ export default function ProductsPage() {
     setUploadingImages(true);
     setError("");
     try {
-      const body = new FormData();
-      Array.from(files).forEach((file) => body.append("images", file));
-      if (form.title.trim()) body.set("alt", form.title.trim());
-
       const endpoint = editingId
         ? `/api/products/${editingId}/images`
         : "/api/products/upload-images";
-      const response = await fetch(endpoint, {
-        method: "POST",
-        headers: {
-          "x-actor-name": user?.name || "Admin",
-          "x-actor-email": user?.email || "",
-        },
-        body,
-      });
+
+      let response: Response | null = null;
+      let lastFail = "";
+      // Fresh FormData each try — required when 3 Admin devices hit the lock together
+      for (let attempt = 0; attempt < 4; attempt += 1) {
+        const body = new FormData();
+        Array.from(files).forEach((file) => body.append("images", file));
+        if (form.title.trim()) body.set("alt", form.title.trim());
+        response = await fetch(endpoint, {
+          method: "POST",
+          headers: {
+            "x-actor-name": user?.name || "Admin",
+            "x-actor-email": user?.email || "",
+          },
+          body,
+        });
+        if (response.ok) break;
+        if (response.status === 409 || response.status === 502 || response.status === 503) {
+          try {
+            const errData = await parseApiJson<{ message?: string }>(response);
+            lastFail = asErrorMessage(
+              errData.message,
+              "Another device is saving right now. Retrying…"
+            );
+          } catch {
+            lastFail = "Another device is saving right now. Retrying…";
+          }
+          await new Promise((r) => setTimeout(r, 800 + attempt * 500));
+          continue;
+        }
+        break;
+      }
+      if (!response) throw new Error(lastFail || "Image upload failed");
+
       const data = await parseApiJson<{
         success?: boolean;
         message?: string;
         data?: Product | ProductImage[];
       }>(response);
       if (!response.ok || !data.success) {
-        throw new Error(asErrorMessage(data.message, "Image upload failed"));
+        throw new Error(asErrorMessage(data.message, lastFail || "Image upload failed"));
       }
 
       if (editingId && data.data && !Array.isArray(data.data)) {
-        // Product document returned from /:id/images
         const productDoc = data.data;
         setForm((prev) => ({ ...prev, images: productDoc.images || [] }));
-        await loadAll();
+        setProducts((prev) =>
+          prev.map((p) => (p._id === editingId ? { ...p, images: productDoc.images || [] } : p))
+        );
         return;
       }
 
@@ -599,23 +648,47 @@ export default function ProductsPage() {
 
   const uploadImages = async (id: string, files: FileList | null) => {
     if (!files?.length) return;
-    const body = new FormData();
-    Array.from(files).forEach((file) => body.append("images", file));
-    const response = await fetch(`/api/products/${id}/images`, {
-      method: "POST",
-      headers: {
-        "x-actor-name": user?.name || "Admin",
-        "x-actor-email": user?.email || "",
-      },
-      body,
-    });
-    const data = await parseApiJson<{ success?: boolean; message?: string; data?: Product }>(response);
-    if (!response.ok || !data.success) {
-      setError(asErrorMessage(data.message, "Image upload failed"));
-      return;
+    setUploadingImages(true);
+    setError("");
+    try {
+      let productDoc: Product | null = null;
+      let lastFail = "";
+      for (let attempt = 0; attempt < 4; attempt += 1) {
+        const body = new FormData();
+        Array.from(files).forEach((file) => body.append("images", file));
+        const response = await fetch(`/api/products/${id}/images`, {
+          method: "POST",
+          headers: {
+            "x-actor-name": user?.name || "Admin",
+            "x-actor-email": user?.email || "",
+          },
+          body,
+        });
+        const data = await parseApiJson<{ success?: boolean; message?: string; data?: Product }>(
+          response
+        );
+        if (response.ok && data.success && data.data) {
+          productDoc = data.data;
+          break;
+        }
+        lastFail = asErrorMessage(data.message, "Image upload failed");
+        if (response.status === 409 || response.status === 502 || response.status === 503) {
+          await new Promise((r) => setTimeout(r, 800 + attempt * 500));
+          continue;
+        }
+        break;
+      }
+      if (!productDoc) {
+        setError(lastFail || "Image upload failed");
+        return;
+      }
+      setProducts((prev) => prev.map((p) => (p._id === id ? { ...p, ...productDoc } : p)));
+      if (editingId === id) openEdit(productDoc);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Image upload failed");
+    } finally {
+      setUploadingImages(false);
     }
-    await loadAll();
-    if (editingId === id && data.data) openEdit(data.data);
   };
 
   const toggleSelect = (id: string) => {
@@ -657,7 +730,7 @@ export default function ProductsPage() {
               <button
                 type="button"
                 onClick={handleDownloadTemplate}
-                title="Download ready-to-use Excel template with sample dummy data and instructions"
+                title="Download updated Excel format — fill all product details; photos via URL/Drive or upload later in admin"
                 className="inline-flex items-center gap-2 rounded-2xl border border-emerald-600/30 bg-emerald-50/90 px-4 py-2.5 text-sm font-semibold text-emerald-800 shadow-sm transition hover:bg-emerald-100 hover:shadow"
               >
                 <Download className="h-4 w-4 text-emerald-700" />
@@ -1319,6 +1392,9 @@ export default function ProductsPage() {
                   <div className="grid gap-4 md:grid-cols-2">
                     <div className="rounded-2xl border border-stone-200 p-4">
                       <p className="mb-1 font-medium text-stone-800">Product images</p>
+                      <p className="mb-2 text-[11px] text-stone-500">
+                        Safe for multi-device (same Admin login). If another device is saving, upload auto-retries.
+                      </p>
                       <p className="mb-3 text-xs text-stone-500">
                         Select multiple photos from your computer (max 12, ~8&nbsp;MB each). No URL paste.
                       </p>
@@ -1558,10 +1634,12 @@ export default function ProductsPage() {
                       <FileText className="mt-0.5 h-5 w-5 shrink-0 text-emerald-700" />
                       <div>
                         <p className="text-sm font-semibold text-emerald-900">
-                          Need the standard Excel format?
+                          Download Format (updated)
                         </p>
                         <p className="text-xs text-emerald-700">
-                          Download the pre-filled template with sample dummy data and column guides.
+                          Workbook has <strong>Fill_Here</strong> + <strong>Sample_Products</strong> with{" "}
+                          <strong>10 dummy products</strong>, plus <strong>Instructions</strong>. Edit/replace dummy
+                          rows with your data; photos optional (URL/Drive or upload later).
                         </p>
                       </div>
                     </div>
@@ -1571,7 +1649,7 @@ export default function ProductsPage() {
                       className="inline-flex shrink-0 items-center gap-1.5 rounded-xl bg-emerald-700 px-3.5 py-1.5 text-xs font-semibold text-white shadow-sm hover:bg-emerald-800"
                     >
                       <Download className="h-3.5 w-3.5" />
-                      Download Template
+                      Download Format
                     </button>
                   </div>
 
@@ -1717,20 +1795,21 @@ export default function ProductsPage() {
                       {/* Multiple Images Highlight Box */}
                       <div className="rounded-2xl border border-amber-200/80 bg-amber-50/70 p-4 text-xs text-amber-900 space-y-1.5">
                         <p className="font-semibold text-amber-950 flex items-center gap-1.5 text-[12px]">
-                          <span>📸</span> How to Add Multiple Images for Every Product:
-                        </p>
-                        <p className="text-amber-900 leading-relaxed">
-                          In the Excel template, you can add multiple photos in two easy ways:
+                          Photos (Excel or manual)
                         </p>
                         <ul className="list-disc list-inside space-y-1 text-amber-800 ml-1">
                           <li>
-                            <strong className="text-amber-950">Option A (Separate Columns):</strong> Use <code>Primary Image URL</code> for the cover photo, and <code>Image 2 URL</code>, <code>Image 3 URL</code>, <code>Image 4 URL</code>, <code>Image 5 URL</code> for gallery photos.
+                            <strong className="text-amber-950">In Excel (Option A):</strong>{" "}
+                            <code>Primary Image URL</code> + <code>Image 2…8 URL</code> (https or Google Drive share link).
+                            Links are saved into <code>/uploads/products/</code> on import when downloadable.
                           </li>
                           <li>
-                            <strong className="text-amber-950">Option B (All in one column):</strong> In <code>All Images (Comma Separated)</code>, paste all your links separated by comma: <code>url1, url2, url3</code>
+                            <strong className="text-amber-950">In Excel (Option B):</strong>{" "}
+                            <code>All Images (Comma Separated)</code> → <code>url1, url2, url3</code>
                           </li>
                           <li>
-                            Both direct URLs (https://...) and <strong>Google Drive share links</strong> (drive.google.com/file/d/...) are automatically recognized!
+                            <strong className="text-amber-950">Manual (Option C):</strong> Leave image columns empty,
+                            import text/price details, then open each product and upload photos one by one in Admin.
                           </li>
                         </ul>
                       </div>
@@ -1738,15 +1817,15 @@ export default function ProductsPage() {
                       {/* Complete Field Checklist */}
                       <div className="space-y-2 rounded-2xl border border-stone-200/80 bg-stone-50/60 p-4 text-xs text-stone-600">
                         <p className="text-[11px] font-semibold uppercase tracking-wider text-stone-800">
-                          All Manual Product Fields Included in Excel Format:
+                          Excel covers the full product form
                         </p>
                         <div className="grid sm:grid-cols-2 gap-x-4 gap-y-1.5 text-[11px]">
                           <div><strong className="text-stone-800">Basic:</strong> Title *, SKU, Category, Status</div>
                           <div><strong className="text-stone-800">Pricing & Stock:</strong> MRP, Sale Price, Discount %, Quantity, Low Stock Alert</div>
-                          <div><strong className="text-stone-800">Descriptions:</strong> Short & Full Description, Mouse Hover Details (| separated)</div>
-                          <div><strong className="text-stone-800">Badges & Intentions:</strong> New Badge, Featured, Best Seller, Intention Tags</div>
-                          <div><strong className="text-stone-800">All Attributes:</strong> Face, Stone, Shape, Weight, Gender, Color, Occasion, Zodiac, Material, Mukhi, Jewelry Type, Planet, Origin</div>
-                          <div><strong className="text-stone-800">Variants & SEO:</strong> Variants (mukhi/size/price/stock), Meta Title, Meta Description, Link Remedy</div>
+                          <div><strong className="text-stone-800">Copy:</strong> Short & Full Description, Mouse Hover Details (|)</div>
+                          <div><strong className="text-stone-800">Badges:</strong> New, Featured, Best Seller, Intention Tags</div>
+                          <div><strong className="text-stone-800">Attributes:</strong> Face, Stone, Shape, Weight, Gender, Color, Occasion, Zodiac, Material, Mukhi, Jewelry Type, Planet, Origin</div>
+                          <div><strong className="text-stone-800">Extras:</strong> Variants, Meta SEO, Remedy link, Images (URL/Drive or later manual)</div>
                         </div>
                       </div>
                     </form>
