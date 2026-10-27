@@ -1453,15 +1453,57 @@ export default function ProductsPage() {
                             )}
                             <button
                               type="button"
-                              onClick={() =>
-                                setForm((prev) => {
-                                  const next = prev.images.filter((_, i) => i !== index);
-                                  if (next.length && !next.some((item) => item.isPrimary)) {
-                                    next[0].isPrimary = true;
+                              title="Remove image"
+                              onClick={() => {
+                                void (async () => {
+                                  const url = img.url;
+                                  if (editingId && url) {
+                                    try {
+                                      const response = await fetch(
+                                        `/api/products/${editingId}/images?url=${encodeURIComponent(url)}`,
+                                        {
+                                          method: "DELETE",
+                                          headers: {
+                                            "x-actor-name": user?.name || "Admin",
+                                            "x-actor-email": user?.email || "",
+                                          },
+                                        }
+                                      );
+                                      const data = await parseApiJson<{
+                                        success?: boolean;
+                                        message?: string;
+                                        data?: Product;
+                                      }>(response);
+                                      if (!response.ok || !data.success) {
+                                        throw new Error(
+                                          asErrorMessage(data.message, "Failed to remove image")
+                                        );
+                                      }
+                                      const nextImages = data.data?.images || [];
+                                      setForm((prev) => ({ ...prev, images: nextImages }));
+                                      setProducts((prev) =>
+                                        prev.map((p) =>
+                                          p._id === editingId ? { ...p, images: nextImages } : p
+                                        )
+                                      );
+                                      return;
+                                    } catch (err) {
+                                      setError(
+                                        err instanceof Error ? err.message : "Failed to remove image"
+                                      );
+                                      return;
+                                    }
                                   }
-                                  return { ...prev, images: next };
-                                })
-                              }
+                                  // New product (not saved yet) — drop from form only
+                                  setForm((prev) => {
+                                    const next = prev.images.filter((_, i) => i !== index);
+                                    if (next.length && !next.some((item) => item.isPrimary)) {
+                                      next[0].isPrimary = true;
+                                    }
+                                    return { ...prev, images: next };
+                                  });
+                                })();
+                              }}
                               className="absolute right-1 top-1 rounded-full bg-black/60 p-0.5 text-white"
                             >
                               <X className="h-3 w-3" />
