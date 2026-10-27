@@ -1,9 +1,7 @@
 /**
  * Streaming API proxy → BACKEND_URL.
- * Needed for large video/image uploads: Next.js rewrites buffer bodies and often
- * return an HTML error page (413/502), which the admin UI then fails to parse as JSON.
- *
- * Always prefer JSON error bodies so parseApiJson never sees raw HTML gateways.
+ * Large uploads must stream (Next rewrites buffer and often return HTML 413/502).
+ * Convert upstream HTML error pages into JSON so the admin UI never crashes.
  */
 const http = require("http");
 const https = require("https");
@@ -17,10 +15,7 @@ export const config = {
   },
 };
 
-const PROXY_TIMEOUT_MS = 5 * 60 * 1000; // 5 minutes (video compress + upload)
-
-const httpAgent = new http.Agent({ keepAlive: true, maxSockets: 32 });
-const httpsAgent = new https.Agent({ keepAlive: true, maxSockets: 32 });
+const PROXY_TIMEOUT_MS = 5 * 60 * 1000;
 
 function backendBase() {
   const raw = String(process.env.BACKEND_URL || "").trim().replace(/\/$/, "");
@@ -47,6 +42,73 @@ function isHtmlContentType(value) {
   return /text\/html/i.test(String(value || ""));
 }
 
+function messageFromHtml(status, body) {
+  const text = String(body || "")
+    .replace(/<br\s*\/?>/gi, "\n")
+    .replace(/&nbsp;/gi, " ")
+    .replace(/&#39;/gi, "'")
+    .replace(/&quot;/gi, '"')
+    .replace(/&lt;/gi, "<")
+    .replace(/&gt;/gi, ">")
+    .replace(/&amp;/gi, "&")
+    .replace(/<[^>]+>/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+
+  if (status === 413 || /entity too large|payload too large|file too large/i.test(text)) {
+    return "File too large. Please upload a smaller file.";
+  }
+  if (status === 504 || /timed? ?out|gateway time-out/i.test(text)) {
+    return "API timed out. Wait a few seconds and try again.";
+  }
+  if (/ECONNREFUSED|not reachable/i.test(text)) {
+    return "API server is not reachable. Check BACKEND_URL and that the backend is running.";
+  }
+  if (/SyntaxError|JSON/i.test(text)) {
+    return "Invalid request data was sent to the API. Please refresh and try again.";
+  }
+  if (status === 404 || /cannot (get|post|put|patch|delete)/i.test(text)) {
+    return "API route not found. Redeploy/restart the admin backend, then refresh.";
+  }
+  if (status === 502 || status === 503) {
+    return "API temporarily unavailable. Wait a few seconds and refresh.";
+  }
+  if (text && text.length < 240) {
+    return text;
+  }
+  return status >= 500
+    ? "Something went wrong on the server. Please try again."
+    : `Request failed (HTTP ${status}). Please try again.`;
+}
+
+function buildProxyHeaders(req, target) {
+  const headers = {};
+  for (const [key, value] of Object.entries(req.headers || {})) {
+    const lower = key.toLowerCase();
+    // Drop hop-by-hop / encoding headers that break streamed proxying
+    if (
+      [
+        "host",
+        "connection",
+        "keep-alive",
+        "proxy-authenticate",
+        "proxy-authorization",
+        "te",
+        "trailer",
+        "transfer-encoding",
+        "upgrade",
+        "accept-encoding",
+      ].includes(lower)
+    ) {
+      continue;
+    }
+    headers[key] = value;
+  }
+  headers.host = target.host;
+  headers.connection = "close";
+  return headers;
+}
+
 export default function handler(req, res) {
   let target;
   try {
@@ -59,41 +121,34 @@ export default function handler(req, res) {
   const incomingPath = req.url || "/api";
   const proxyPath = incomingPath.startsWith("/api") ? incomingPath : `/api${incomingPath}`;
 
-  const headers = { ...req.headers, host: target.host };
-  delete headers["accept-encoding"];
-  // Avoid stale keep-alive confusion through Next → backend
-  headers.connection = "keep-alive";
-
   const options = {
     protocol: target.protocol,
     hostname: target.hostname,
     port: target.port || (target.protocol === "https:" ? 443 : 80),
     path: proxyPath,
     method: req.method,
-    headers,
+    headers: buildProxyHeaders(req, target),
     timeout: PROXY_TIMEOUT_MS,
-    agent: target.protocol === "https:" ? httpsAgent : httpAgent,
+    // Avoid keep-alive reuse after backend restarts (stale sockets → false 502s)
+    agent: false,
   };
 
   const lib = target.protocol === "https:" ? https : http;
   const proxyReq = lib.request(options, (proxyRes) => {
     const status = proxyRes.statusCode || 502;
     const contentType = proxyRes.headers["content-type"] || "";
+    const htmlResponse = isHtmlContentType(contentType);
 
-    // Upstream nginx/hosting HTML error pages → convert to JSON for the admin UI
-    const maybeHtmlGateway =
-      isHtmlContentType(contentType) || status === 502 || status === 503 || status === 504;
-    if (maybeHtmlGateway) {
+    // HTML from Express/nginx → JSON for the admin UI
+    if (htmlResponse || status === 502 || status === 503 || status === 504) {
       const chunks = [];
       proxyRes.on("data", (chunk) => chunks.push(chunk));
       proxyRes.on("end", () => {
         const body = Buffer.concat(chunks).toString("utf8");
         const trimmed = body.trim();
-        const looksHtml =
-          isHtmlContentType(contentType) || /^</.test(trimmed) || /<html/i.test(trimmed);
         const looksJson = trimmed.startsWith("{") || trimmed.startsWith("[");
+        const looksHtml = htmlResponse || /^</.test(trimmed) || /<html/i.test(trimmed);
 
-        // Backend already returned JSON — pass it through unchanged
         if (looksJson && !looksHtml) {
           if (!res.headersSent) {
             res.statusCode = status;
@@ -104,15 +159,7 @@ export default function handler(req, res) {
           return;
         }
 
-        const message =
-          status === 504
-            ? "API timed out. Wait a few seconds and try again."
-            : status === 413 || /entity too large|payload too large/i.test(body)
-              ? "File too large. Please upload a smaller file."
-              : /ECONNREFUSED|not reachable/i.test(body)
-                ? "API server is not reachable. Check BACKEND_URL and that the backend is running."
-                : "API temporarily unavailable. Your last save may still have worked — refresh once after a few seconds.";
-        sendJsonError(res, status >= 400 ? status : 502, message);
+        sendJsonError(res, status >= 400 ? status : 502, messageFromHtml(status, body));
       });
       proxyRes.on("error", (err) => {
         console.error("[api-proxy] upstream body", err.message);
@@ -122,7 +169,6 @@ export default function handler(req, res) {
     }
 
     const outHeaders = { ...proxyRes.headers };
-    // Let Node recompute framing while piping
     delete outHeaders["transfer-encoding"];
     delete outHeaders["content-length"];
     try {

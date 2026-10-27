@@ -653,31 +653,49 @@ export default function ProductsPage() {
   };
 
   const bulkDelete = async () => {
-    if (!selected.length) return;
+    const idsToDelete = [...selected];
+    if (!idsToDelete.length) return;
     if (
       !confirm(
-        `Delete ${selected.length} selected product${selected.length === 1 ? "" : "s"} permanently?\n\nImages and all product details will also be removed from the database.`
+        `Delete ${idsToDelete.length} selected product${idsToDelete.length === 1 ? "" : "s"} permanently?\n\nImages and all product details will also be removed from the database.`
       )
     ) {
       return;
     }
     setError("");
-    const response = await fetch("/api/products/bulk-delete", {
-      method: "POST",
-      headers: actorHeaders,
-      body: JSON.stringify({
-        ids: selected,
-        actor: user?.name || "Admin",
-        actorEmail: user?.email || "",
-      }),
-    });
-    const data = await parseApiJson<{ success?: boolean; message?: string }>(response);
-    if (!response.ok || !data.success) {
-      setError(asErrorMessage(data.message, "Bulk delete failed"));
-      return;
+    setLoading(true);
+    try {
+      const response = await fetch("/api/products/bulk-delete", {
+        method: "POST",
+        headers: actorHeaders,
+        body: JSON.stringify({
+          ids: idsToDelete,
+          actor: user?.name || "Admin",
+          actorEmail: user?.email || "",
+        }),
+      });
+      const data = await parseApiJson<{
+        success?: boolean;
+        message?: string;
+        data?: { deletedCount?: number };
+      }>(response);
+      if (!response.ok || !data.success) {
+        setError(asErrorMessage(data.message, "Bulk delete failed"));
+        return;
+      }
+      const deletedCount = Number(data.data?.deletedCount || idsToDelete.length);
+      if (deletedCount < idsToDelete.length) {
+        setError(
+          `Only ${deletedCount} of ${idsToDelete.length} products were deleted. Refresh and try again for the rest.`
+        );
+      }
+      setSelected([]);
+      await loadAll();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Bulk delete failed");
+    } finally {
+      setLoading(false);
     }
-    setSelected([]);
-    await loadAll();
   };
 
   const uploadImages = async (id: string, files: FileList | null) => {

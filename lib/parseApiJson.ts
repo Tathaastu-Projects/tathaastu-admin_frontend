@@ -23,7 +23,7 @@ function friendlyError(status: number, body: string): string | null {
     return "Another device is saving right now. Wait 2 seconds and upload again.";
   }
   if (status === 502 || status === 503) {
-    return "API temporarily unavailable. Your last save may still have worked — refresh once after a few seconds.";
+    return "API temporarily unavailable. Wait a few seconds and refresh.";
   }
   if (status === 401 || status === 403) {
     return "Please log in again and try.";
@@ -87,17 +87,18 @@ export async function parseApiJson<T = ApiJson>(response: Response): Promise<T> 
 
     const looksHtml = /^</.test(trimmed) || /<html/i.test(trimmed);
     if (looksHtml) {
-      if (response.status === 502 || response.status === 503 || response.status >= 500) {
-        return softFail(
-          "API temporarily unavailable. Your last save may still have worked — refresh once after a few seconds."
-        );
-      }
       if (response.status === 413) {
         return softFail(`File too large. Please upload a file under ${MAX_UPLOAD_MB} MB.`);
       }
-      // Next/nginx HTML error page (often misconfigured BACKEND_URL or proxy)
+      if (response.status === 502 || response.status === 503) {
+        return softFail("API temporarily unavailable. Wait a few seconds and refresh.");
+      }
+      if (response.status === 404) {
+        return softFail("API route not found. Redeploy/restart the admin backend, then refresh.");
+      }
       return softFail(
-        "API returned an unexpected page instead of data. Check that the admin API (BACKEND_URL) is running, then refresh."
+        friendlyError(response.status, trimmed) ||
+          "API returned an unexpected page instead of data. Refresh and try again."
       );
     }
 
