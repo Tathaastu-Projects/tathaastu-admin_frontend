@@ -633,7 +633,13 @@ export default function ProductsPage() {
   };
 
   const deleteProduct = async (id: string) => {
-    if (!confirm("Delete this product permanently?")) return;
+    if (
+      !confirm(
+        "Delete this product permanently?\n\nThis removes the product, all its images, and related details from the database."
+      )
+    ) {
+      return;
+    }
     const response = await fetch(`/api/products/${id}`, {
       method: "DELETE",
       headers: actorHeaders,
@@ -643,6 +649,35 @@ export default function ProductsPage() {
       setError(asErrorMessage(data.message, "Delete failed"));
       return;
     }
+    setSelected((prev) => prev.filter((sid) => sid !== id));
+    await loadAll();
+  };
+
+  const bulkDelete = async () => {
+    if (!selected.length) return;
+    if (
+      !confirm(
+        `Delete ${selected.length} selected product${selected.length === 1 ? "" : "s"} permanently?\n\nImages and all product details will also be removed from the database.`
+      )
+    ) {
+      return;
+    }
+    setError("");
+    const response = await fetch("/api/products/bulk-delete", {
+      method: "POST",
+      headers: actorHeaders,
+      body: JSON.stringify({
+        ids: selected,
+        actor: user?.name || "Admin",
+        actorEmail: user?.email || "",
+      }),
+    });
+    const data = await parseApiJson<{ success?: boolean; message?: string }>(response);
+    if (!response.ok || !data.success) {
+      setError(asErrorMessage(data.message, "Bulk delete failed"));
+      return;
+    }
+    setSelected([]);
     await loadAll();
   };
 
@@ -862,6 +897,13 @@ export default function ProductsPage() {
                 </button>
                 <button type="button" onClick={() => bulkStatus("draft")} className="rounded-lg bg-amber-700 px-3 py-1 text-white">
                   Move to Draft
+                </button>
+                <button
+                  type="button"
+                  onClick={() => void bulkDelete()}
+                  className="rounded-lg bg-rose-700 px-3 py-1 text-white hover:bg-rose-800"
+                >
+                  Bulk Delete
                 </button>
               </div>
             )}
