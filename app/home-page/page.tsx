@@ -69,7 +69,7 @@ const PORTIONS = [
     id: "portion-screen-to-space",
     number: "06",
     title: "Screen to space (Reels)",
-    text: "The shoppable portrait video cards with products and 'SHOP NOW' buttons before testimonials.",
+    text: "Portrait video reels that open a selected shop category tab when clicked.",
   },
   {
     id: "portion-testimonials",

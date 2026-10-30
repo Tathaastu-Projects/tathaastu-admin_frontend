@@ -17,7 +17,6 @@ export const CATEGORY_TABS: CategoryOption[] = [
   { id: "tumbles", label: "Tumbles", href: "/shop/tumbles" },
   { id: "crystal-trees", label: "Crystal Trees", href: "/shop/crystal-trees" },
   { id: "pyramids", label: "Pyramids", href: "/shop/pyramids" },
-  { id: "loose-stones", label: "Loose Stones", href: "/shop/loose-stones" },
   { id: "mala", label: "Mala", href: "/shop/mala" },
   { id: "photo-frames", label: "Photo Frames", href: "/shop/photo-frames" },
   { id: "other", label: "Other", href: "/shop/other" },
