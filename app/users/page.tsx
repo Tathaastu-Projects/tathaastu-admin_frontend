@@ -90,7 +90,8 @@ type OrderHistory = {
   shippingAddressText: string;
   items: OrderItem[];
   pricing: { subtotal: number; discount: number; shipping: number; total: number };
-  razorpayPaymentId?: string;
+  easebuzzPaymentId?: string;
+  easebuzzTxnId?: string;
   createdAt?: string;
   updatedAt?: string;
 };
@@ -775,9 +776,9 @@ export default function UsersManagementPage() {
                                     {order.couponCode ? (
                                       <p className="text-gray-700">Coupon: {order.couponCode}</p>
                                     ) : null}
-                                    {order.razorpayPaymentId ? (
+                                    {order.easebuzzPaymentId || order.easebuzzTxnId ? (
                                       <p className="text-gray-700">
-                                        Razorpay: {order.razorpayPaymentId}
+                                        Easebuzz: {order.easebuzzPaymentId || order.easebuzzTxnId}
                                       </p>
                                     ) : null}
                                   </div>

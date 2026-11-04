@@ -14,6 +14,10 @@ import { CategoryBannersSection } from "@/components/homepage/CategoryBannersSec
 import { SeoSection } from "@/components/homepage/SeoSection";
 import { HeaderBarSection } from "@/components/homepage/HeaderBarSection";
 import { HeroTickerSection } from "@/components/homepage/HeroTickerSection";
+import { HomeHeroVideoSection } from "@/components/homepage/HomeHeroVideoSection";
+import { Remedies3dPricesSection } from "@/components/homepage/Remedies3dPricesSection";
+import { VideoSpeedSection } from "@/components/homepage/VideoSpeedSection";
+import { RashiLogosSection } from "@/components/homepage/RashiLogosSection";
 import { Home } from "lucide-react";
 
 const PORTIONS = [
@@ -30,8 +34,26 @@ const PORTIONS = [
     text: "The thin strip at the very top of the website (Priyanka Singh / Lab-Certified / Shipping text).",
   },
   {
-    id: "portion-hero-ticker",
+    id: "portion-video-speed",
+    number: "00b2",
+    title: "Video speed (slow / fast)",
+    text: "Control playback speed for Abhimantrit homepage videos — slow, normal, fast, or very fast.",
+  },
+  {
+    id: "portion-rashi-logos",
+    number: "00b3",
+    title: "Rashi bracelet logos",
+    text: "Upload the zodiac logo for each Rashi Bracelets Collection card (Mesh, Vrishabha, Mithun, …).",
+  },
+  {
+    id: "portion-hero-video",
     number: "00c",
+    title: "Hero video (full screen)",
+    text: "Zomato-style looping background video on homepage open — upload MP4, edit headline, and Scroll down cue.",
+  },
+  {
+    id: "portion-hero-ticker",
+    number: "00d",
     title: "Hero ticker (auto-scroll)",
     text: "Dark green scrolling strip under the hero — Astrology-Guided, Lab-Certified, Free Shipping, etc.",
   },
@@ -89,11 +111,20 @@ const PORTIONS = [
     title: "Category Banners",
     text: "Custom banners for Crystal Bracelets, Rudraksha, Anklets, Trees, Pyramids, and all categories.",
   },
+  {
+    id: "portion-3d-prices",
+    number: "10",
+    title: "3D remedies prices",
+    text: "Selling price, MRP, offer %, and buy button text for every model in the homepage 3D explorer.",
+  },
 ];
 
 const PANELS: Record<string, ReactNode> = {
   "portion-seo": <SeoSection />,
   "portion-header-bar": <HeaderBarSection />,
+  "portion-video-speed": <VideoSpeedSection />,
+  "portion-rashi-logos": <RashiLogosSection />,
+  "portion-hero-video": <HomeHeroVideoSection />,
   "portion-hero-ticker": <HeroTickerSection />,
   "portion-banners": <HomeBannersSection />,
   "portion-categories": <ShopCategoriesSection />,
@@ -104,6 +135,7 @@ const PANELS: Record<string, ReactNode> = {
   "portion-testimonials": <TestimonialsSection />,
   "portion-blog": <HomeBlogSection />,
   "portion-category-banners": <CategoryBannersSection />,
+  "portion-3d-prices": <Remedies3dPricesSection />,
 };
 
 export default function HomePageAdmin() {

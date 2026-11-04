@@ -14,6 +14,14 @@ import {
   ChevronRight,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { useAuthStore } from "@/store/authStore";
+
+function adminHeaders(token: string | null, json = false): HeadersInit {
+  return {
+    ...(json ? { "Content-Type": "application/json" } : {}),
+    ...(token ? { Authorization: `Bearer ${token}` } : {}),
+  };
+}
 
 type OrderStatus = "placed" | "confirmed" | "packed" | "shipped" | "delivered" | "cancelled";
 type PaymentStatus = "pending" | "paid" | "failed" | "refunded";
@@ -52,6 +60,9 @@ interface StoreOrder {
   status: OrderStatus;
   notes?: string;
   adminNote?: string;
+  easebuzzTxnId?: string;
+  easebuzzPaymentId?: string;
+  easebuzzStatus?: string;
   createdAt?: string;
   updatedAt?: string;
 }
@@ -119,6 +130,8 @@ export default function StoreOrdersPage() {
   const [selected, setSelected] = useState<StoreOrder | null>(null);
   const [detailLoading, setDetailLoading] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [syncing, setSyncing] = useState(false);
+  const [reconciling, setReconciling] = useState(false);
   const [editStatus, setEditStatus] = useState<OrderStatus>("placed");
   const [editPayment, setEditPayment] = useState<PaymentStatus>("pending");
   const [adminNote, setAdminNote] = useState("");
@@ -128,6 +141,8 @@ export default function StoreOrdersPage() {
     setToast(message);
     window.setTimeout(() => setToast(""), 2800);
   };
+
+  const token = useAuthStore((state) => state.token);
 
   const loadOrders = useCallback(async () => {
     setLoading(true);
@@ -142,6 +157,7 @@ export default function StoreOrdersPage() {
 
       const response = await fetch(`/api/store/admin/orders?${params.toString()}`, {
         cache: "no-store",
+        headers: adminHeaders(token),
       });
       const json = await response.json();
       if (!response.ok || !json.success) {
@@ -156,7 +172,7 @@ export default function StoreOrdersPage() {
     } finally {
       setLoading(false);
     }
-  }, [page, statusFilter, query]);
+  }, [page, statusFilter, query, token]);
 
   useEffect(() => {
     loadOrders();
@@ -169,7 +185,9 @@ export default function StoreOrdersPage() {
     setAdminNote(order.adminNote || "");
     setDetailLoading(true);
     try {
-      const response = await fetch(`/api/store/admin/orders/${order._id}`);
+      const response = await fetch(`/api/store/admin/orders/${order._id}`, {
+        headers: adminHeaders(token),
+      });
       const json = await response.json();
       if (response.ok && json.success && json.data) {
         setSelected(json.data);
@@ -197,7 +215,7 @@ export default function StoreOrdersPage() {
     try {
       const response = await fetch(`/api/store/admin/orders/${selected._id}/status`, {
         method: "PATCH",
-        headers: { "Content-Type": "application/json" },
+        headers: adminHeaders(token, true),
         body: JSON.stringify({
           status: editStatus,
           paymentStatus: editPayment,
@@ -218,6 +236,55 @@ export default function StoreOrdersPage() {
     }
   };
 
+  const syncPayment = async () => {
+    if (!selected) return;
+    setSyncing(true);
+    try {
+      const response = await fetch(`/api/store/admin/orders/${selected._id}/sync-payment`, {
+        method: "POST",
+        headers: adminHeaders(token),
+      });
+      const json = await response.json();
+      if (!response.ok || !json.success) {
+        throw new Error(json.message || "Failed to sync payment");
+      }
+      if (json.data) {
+        setSelected(json.data);
+        setEditStatus(json.data.status);
+        setEditPayment(json.data.paymentStatus);
+      }
+      showToast(json.message || "Payment synced");
+      await loadOrders();
+    } catch (err) {
+      showToast(err instanceof Error ? err.message : "Sync failed");
+    } finally {
+      setSyncing(false);
+    }
+  };
+
+  const reconcilePending = async () => {
+    setReconciling(true);
+    try {
+      const response = await fetch(`/api/store/admin/payments/reconcile`, {
+        method: "POST",
+        headers: adminHeaders(token),
+      });
+      const json = await response.json();
+      if (!response.ok || !json.success) {
+        throw new Error(json.message || "Reconcile failed");
+      }
+      const s = json.data || {};
+      showToast(
+        `Reconcile: checked ${s.checked || 0}, paid ${s.paid || 0}, failed ${s.failed || 0}, expired ${s.expired || 0}`,
+      );
+      await loadOrders();
+    } catch (err) {
+      showToast(err instanceof Error ? err.message : "Reconcile failed");
+    } finally {
+      setReconciling(false);
+    }
+  };
+
   return (
     <DashboardLayout>
       <div className="p-6 space-y-6">
@@ -232,14 +299,25 @@ export default function StoreOrdersPage() {
               .
             </p>
           </div>
-          <button
-            type="button"
-            onClick={() => loadOrders()}
-            className="inline-flex items-center gap-2 px-4 py-2 rounded-lg border border-gray-200 bg-white text-gray-700 hover:bg-spiritual-lightGold transition-colors"
-          >
-            <RefreshCw className={cn("w-4 h-4", loading && "animate-spin")} />
-            Refresh
-          </button>
+          <div className="flex flex-wrap gap-2">
+            <button
+              type="button"
+              onClick={() => reconcilePending()}
+              disabled={reconciling}
+              className="inline-flex items-center gap-2 px-4 py-2 rounded-lg border border-amber-200 bg-amber-50 text-amber-900 hover:bg-amber-100 transition-colors disabled:opacity-60"
+            >
+              <RefreshCw className={cn("w-4 h-4", reconciling && "animate-spin")} />
+              {reconciling ? "Reconciling…" : "Sync pending payments"}
+            </button>
+            <button
+              type="button"
+              onClick={() => loadOrders()}
+              className="inline-flex items-center gap-2 px-4 py-2 rounded-lg border border-gray-200 bg-white text-gray-700 hover:bg-spiritual-lightGold transition-colors"
+            >
+              <RefreshCw className={cn("w-4 h-4", loading && "animate-spin")} />
+              Refresh
+            </button>
+          </div>
         </div>
 
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
@@ -520,6 +598,35 @@ export default function StoreOrdersPage() {
                 <section className="rounded-xl border border-amber-200 bg-amber-50 p-4">
                   <h3 className="font-semibold text-amber-900">Customer notes</h3>
                   <p className="text-sm text-amber-800 mt-1">{selected.notes}</p>
+                </section>
+              ) : null}
+
+              {selected.paymentMethod === "online" ? (
+                <section className="rounded-xl border border-sky-200 bg-sky-50 p-4 space-y-2">
+                  <h3 className="font-semibold text-sky-900">Easebuzz payment</h3>
+                  <p className="text-sm text-sky-900">
+                    Status: <strong>{selected.paymentStatus}</strong>
+                    {selected.easebuzzStatus ? ` (${selected.easebuzzStatus})` : ""}
+                  </p>
+                  {selected.easebuzzTxnId ? (
+                    <p className="text-xs text-sky-800 break-all">Txn: {selected.easebuzzTxnId}</p>
+                  ) : null}
+                  {selected.easebuzzPaymentId ? (
+                    <p className="text-xs text-sky-800 break-all">
+                      Pay ID: {selected.easebuzzPaymentId}
+                    </p>
+                  ) : null}
+                  {selected.paymentStatus === "pending" ? (
+                    <button
+                      type="button"
+                      disabled={syncing}
+                      onClick={syncPayment}
+                      className="mt-1 inline-flex items-center gap-2 px-3 py-2 rounded-lg bg-sky-700 text-white text-sm font-medium disabled:opacity-60"
+                    >
+                      <RefreshCw className={cn("w-4 h-4", syncing && "animate-spin")} />
+                      {syncing ? "Syncing…" : "Sync from Easebuzz"}
+                    </button>
+                  ) : null}
                 </section>
               ) : null}
 

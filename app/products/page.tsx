@@ -1155,7 +1155,19 @@ export default function ProductsPage() {
                         value={form.sku}
                         onChange={(e) => setForm((prev) => ({ ...prev, sku: e.target.value }))}
                         className="w-full rounded-xl border border-stone-200 px-3 py-2.5 outline-none focus:ring-2 focus:ring-brand-maroon/30"
+                        placeholder="e.g. NE245H"
                       />
+                      <span className="mt-1 block text-[11px] text-stone-500">
+                        After save, product URL becomes{" "}
+                        <code className="rounded bg-stone-100 px-1 font-mono">
+                          /product/
+                          {(form.sku || form.slug || "sku")
+                            .toLowerCase()
+                            .replace(/[^a-z0-9]+/g, "-")
+                            .replace(/^-|-$/g, "") || "sku"}
+                        </code>
+                        . Click Update Product, then open the shop listing (not an old browser tab).
+                      </span>
                     </label>
                     <label className="text-sm">
                       <span className="mb-1 block font-medium text-stone-700">Category</span>
