@@ -93,6 +93,7 @@ interface Product {
   hoverDetails?: { label: string }[];
   attributes?: Record<string, string>;
   seo?: { metaTitle?: string; metaDescription?: string };
+  faqs?: { question: string; answer: string }[];
   linkedRemedyId?: string | null;
   linkedRemedyName?: string;
   discountPercent?: number;
@@ -151,6 +152,7 @@ const emptyForm = {
     origin: "",
   },
   seo: { metaTitle: "", metaDescription: "" },
+  faqs: [] as { question: string; answer: string }[],
   linkedRemedyId: "",
   linkedRemedyName: "",
   variants: [] as Variant[],
@@ -439,6 +441,12 @@ export default function ProductsPage() {
         metaTitle: product.seo?.metaTitle || "",
         metaDescription: product.seo?.metaDescription || "",
       },
+      faqs: (product.faqs || [])
+        .map((item) => ({
+          question: String(item?.question || "").trim(),
+          answer: String(item?.answer || "").trim(),
+        }))
+        .filter((item) => item.question || item.answer),
       linkedRemedyId: product.linkedRemedyId || "",
       linkedRemedyName: product.linkedRemedyName || "",
       variants: product.variants || [],
@@ -1274,6 +1282,94 @@ export default function ProductsPage() {
                       className="w-full rounded-xl border border-stone-200 px-3 py-2.5"
                     />
                   </label>
+
+                  <div className="rounded-2xl border border-stone-200 bg-stone-50/70 p-4">
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <div>
+                        <p className="text-sm font-semibold text-stone-800">Product FAQs</p>
+                        <p className="mt-0.5 text-xs text-stone-500">
+                          Shown only on this product page. Leave empty to hide the FAQ block.
+                        </p>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setForm((prev) => ({
+                            ...prev,
+                            faqs: [...prev.faqs, { question: "", answer: "" }],
+                          }))
+                        }
+                        className="rounded-xl border border-stone-300 bg-white px-3 py-1.5 text-xs font-medium text-stone-700"
+                      >
+                        Add FAQ
+                      </button>
+                    </div>
+                    <div className="mt-3 space-y-3">
+                      {form.faqs.map((faq, index) => (
+                        <div
+                          key={`faq-${index}`}
+                          className="rounded-xl border border-stone-200 bg-white p-3"
+                        >
+                          <div className="mb-2 flex items-center justify-between gap-2">
+                            <p className="text-xs font-semibold uppercase tracking-wide text-stone-500">
+                              FAQ {index + 1}
+                            </p>
+                            <button
+                              type="button"
+                              onClick={() =>
+                                setForm((prev) => ({
+                                  ...prev,
+                                  faqs: prev.faqs.filter((_, i) => i !== index),
+                                }))
+                              }
+                              className="rounded-lg border border-rose-200 px-2.5 py-1 text-[11px] text-rose-700"
+                            >
+                              Remove
+                            </button>
+                          </div>
+                          <label className="block text-sm">
+                            <span className="mb-1 block font-medium text-stone-700">Question</span>
+                            <input
+                              value={faq.question}
+                              onChange={(e) =>
+                                setForm((prev) => ({
+                                  ...prev,
+                                  faqs: prev.faqs.map((item, i) =>
+                                    i === index ? { ...item, question: e.target.value } : item,
+                                  ),
+                                }))
+                              }
+                              className="w-full rounded-xl border border-stone-200 px-3 py-2"
+                              placeholder="e.g. Is this stone certified?"
+                            />
+                          </label>
+                          <label className="mt-2 block text-sm">
+                            <span className="mb-1 block font-medium text-stone-700">Answer</span>
+                            <textarea
+                              rows={3}
+                              value={faq.answer}
+                              onChange={(e) =>
+                                setForm((prev) => ({
+                                  ...prev,
+                                  faqs: prev.faqs.map((item, i) =>
+                                    i === index ? { ...item, answer: e.target.value } : item,
+                                  ),
+                                }))
+                              }
+                              className="w-full rounded-xl border border-stone-200 px-3 py-2"
+                              placeholder="Write a short clear answer"
+                            />
+                          </label>
+                        </div>
+                      ))}
+                      {!form.faqs.length ? (
+                        <p className="text-xs text-stone-500">
+                          No FAQs for this product yet. Add one only if you want them on the product
+                          page.
+                        </p>
+                      ) : null}
+                    </div>
+                  </div>
 
                   <div className="grid gap-4 md:grid-cols-5">
                     <label className="text-sm">
