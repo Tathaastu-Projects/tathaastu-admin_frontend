@@ -256,20 +256,26 @@ export function HomeBlogSection() {
             <div className="grid gap-4 md:grid-cols-[180px_1fr]">
               <div className="flex flex-col gap-2">
                 <div className="h-28 overflow-hidden rounded-xl bg-[#ececec]">
-                  {item.videoPreview ? (
+                  {item.preview ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img
+                      src={item.preview}
+                      alt=""
+                      loading="lazy"
+                      decoding="async"
+                      className="h-full w-full object-cover"
+                    />
+                  ) : item.videoPreview ? (
                     <video
                       key={item.videoPreview}
                       src={item.videoPreview}
-                      poster={item.preview || undefined}
-                      autoPlay
                       loop
                       muted
                       playsInline
+                      preload="none"
+                      controls
                       className="h-full w-full object-cover"
                     />
-                  ) : item.preview ? (
-                    // eslint-disable-next-line @next/next/no-img-element
-                    <img src={item.preview} alt="" className="h-full w-full object-cover" />
                   ) : (
                     <div className="flex h-full items-center justify-center p-2 text-center text-xs text-stone-400">
                       No photo or video

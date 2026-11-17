@@ -18,6 +18,7 @@ import { HomeHeroVideoSection } from "@/components/homepage/HomeHeroVideoSection
 import { Remedies3dPricesSection } from "@/components/homepage/Remedies3dPricesSection";
 import { VideoSpeedSection } from "@/components/homepage/VideoSpeedSection";
 import { RashiLogosSection } from "@/components/homepage/RashiLogosSection";
+import { HowAbhimantritSection } from "@/components/homepage/HowAbhimantritSection";
 import { Home } from "lucide-react";
 
 const PORTIONS = [
@@ -117,6 +118,12 @@ const PORTIONS = [
     title: "3D remedies prices",
     text: "Selling price, MRP, offer %, and buy button text for every model in the homepage 3D explorer.",
   },
+  {
+    id: "portion-how-abhimantrit",
+    number: "11",
+    title: "How Abhimantrit",
+    text: "Four circular images shown after Explore Remedies in 3D — Thoughtfully Sourced, Cleansed Carefully, Energised, Delivered.",
+  },
 ];
 
 const PANELS: Record<string, ReactNode> = {
@@ -136,6 +143,7 @@ const PANELS: Record<string, ReactNode> = {
   "portion-blog": <HomeBlogSection />,
   "portion-category-banners": <CategoryBannersSection />,
   "portion-3d-prices": <Remedies3dPricesSection />,
+  "portion-how-abhimantrit": <HowAbhimantritSection />,
 };
 
 export default function HomePageAdmin() {

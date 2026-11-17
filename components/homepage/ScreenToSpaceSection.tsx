@@ -337,21 +337,23 @@ export function ScreenToSpaceSection() {
                   <div className="shrink-0 flex flex-col items-center">
                     <span className="mb-2 text-xs font-medium text-stone-400">Card #{index + 1} Preview</span>
                     <div className="relative w-[180px] sm:w-[210px] aspect-[9/16] rounded-xl overflow-hidden bg-stone-900 shadow-md border border-stone-300">
-                      {videoPreview ? (
-                        <video
-                          src={videoPreview}
-                          poster={imagePreview}
-                          muted
-                          loop
-                          playsInline
-                          autoPlay
-                          className="absolute inset-0 h-full w-full object-cover"
-                        />
-                      ) : imagePreview ? (
+                      {imagePreview ? (
                         // eslint-disable-next-line @next/next/no-img-element
                         <img
                           src={imagePreview}
                           alt={item.categoryLabel || "Reel"}
+                          loading="lazy"
+                          decoding="async"
+                          className="absolute inset-0 h-full w-full object-cover"
+                        />
+                      ) : videoPreview ? (
+                        <video
+                          src={videoPreview}
+                          muted
+                          loop
+                          playsInline
+                          preload="none"
+                          controls
                           className="absolute inset-0 h-full w-full object-cover"
                         />
                       ) : (

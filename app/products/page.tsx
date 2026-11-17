@@ -1007,6 +1007,8 @@ export default function ProductsPage() {
                                 <img
                                   src={primaryImage(product)}
                                   alt={product.title}
+                                  loading="lazy"
+                                  decoding="async"
                                   className="h-full w-full object-cover"
                                 />
                               ) : (

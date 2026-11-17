@@ -239,7 +239,13 @@ export function FeaturedFindsSection() {
             {videoEmbed ? (
               <iframe src={videoEmbed} className="h-full w-full object-cover" allow="autoplay; muted" />
             ) : videoDisplay ? (
-              <video src={videoDisplay} className="h-full w-full object-cover" muted controls />
+              <video
+                src={videoDisplay}
+                className="h-full w-full object-cover"
+                muted
+                controls
+                preload="none"
+              />
             ) : (
               <div className="flex h-full items-center justify-center text-xs text-stone-400">
                 No video set

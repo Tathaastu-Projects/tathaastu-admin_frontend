@@ -58,20 +58,27 @@ function MediaFrame({
   return (
     <div className="flex flex-col gap-2">
       <div className="relative overflow-hidden rounded-2xl bg-[#f3efe8]" style={{ aspectRatio: aspect }}>
-        {playback ? (
+        {image ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img
+            src={image}
+            alt=""
+            loading="lazy"
+            decoding="async"
+            className="h-full w-full object-cover object-right"
+          />
+        ) : playback ? (
           <video
             key={playback}
             src={previewSrc(playback)}
             poster={image || undefined}
-            autoPlay
             loop
             muted
             playsInline
+            preload="none"
+            controls
             className="h-full w-full object-cover object-right"
           />
-        ) : image ? (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img src={image} alt="" className="h-full w-full object-cover object-right" />
         ) : (
           <div className="flex h-full items-center justify-center px-3 text-center text-xs text-stone-500">
             {empty || "No picture yet"}

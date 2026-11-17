@@ -236,7 +236,13 @@ export function HomeHeroVideoSection() {
 
           <div className="aspect-video overflow-hidden rounded-2xl bg-[#f3efe8]">
             {videoDisplay ? (
-              <video src={videoDisplay} className="h-full w-full object-cover" muted controls />
+              <video
+                src={videoDisplay}
+                className="h-full w-full object-cover"
+                muted
+                controls
+                preload="none"
+              />
             ) : (
               <div className="flex h-full items-center justify-center text-xs text-stone-400">
                 No video set
