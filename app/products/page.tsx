@@ -586,8 +586,17 @@ export default function ProductsPage() {
     setSaving(true);
     setError("");
     try {
+      // Keep only complete product FAQs — empty list hides FAQ block on the storefront
+      const faqs = (form.faqs || [])
+        .map((item) => ({
+          question: String(item?.question || "").trim(),
+          answer: String(item?.answer || "").trim(),
+        }))
+        .filter((item) => item.question && item.answer)
+        .slice(0, 20);
       const payload = {
         ...form,
+        faqs,
         linkedRemedyId: form.linkedRemedyId || null,
         actor: user?.name || "Admin",
         actorEmail: user?.email || "",
@@ -1283,12 +1292,14 @@ export default function ProductsPage() {
                     />
                   </label>
 
-                  <div className="rounded-2xl border border-stone-200 bg-stone-50/70 p-4">
+                  <div className="rounded-2xl border border-brand-maroon/25 bg-[#faf6f2] p-4 ring-1 ring-brand-maroon/10">
                     <div className="flex flex-wrap items-center justify-between gap-2">
                       <div>
-                        <p className="text-sm font-semibold text-stone-800">Product FAQs</p>
+                        <p className="text-sm font-semibold text-stone-800">
+                          Product FAQs (this product only)
+                        </p>
                         <p className="mt-0.5 text-xs text-stone-500">
-                          Shown only on this product page. Leave empty to hide the FAQ block.
+                          Shown on Abhimantrit product page. Leave empty = FAQ section stays hidden.
                         </p>
                       </div>
                       <button
