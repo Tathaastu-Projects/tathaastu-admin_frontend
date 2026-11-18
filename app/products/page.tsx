@@ -402,7 +402,7 @@ export default function ProductsPage() {
     setShowForm(true);
   };
 
-  const openEdit = (product: Product) => {
+  const fillFormFromProduct = (product: Product) => {
     setEditingId(product._id);
     setForm({
       title: product.title || "",
@@ -453,6 +453,24 @@ export default function ProductsPage() {
       images: product.images || [],
     });
     setShowForm(true);
+  };
+
+  /** Always load full product (list API omits faqs/description) so edit shows saved FAQs. */
+  const openEdit = async (product: Product) => {
+    setError("");
+    fillFormFromProduct(product);
+    try {
+      const response = await fetch(`/api/products/${product._id}`);
+      const data = await parseApiJson<{ success?: boolean; message?: string; data?: Product }>(
+        response,
+      );
+      if (!response.ok || !data.success || !data.data) {
+        throw new Error(data.message || "Failed to load full product");
+      }
+      fillFormFromProduct(data.data);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to load product details");
+    }
   };
 
   const toggleIntention = (value: string) => {
@@ -752,7 +770,7 @@ export default function ProductsPage() {
         return;
       }
       setProducts((prev) => prev.map((p) => (p._id === id ? { ...p, ...productDoc } : p)));
-      if (editingId === id) openEdit(productDoc);
+      if (editingId === id) void openEdit(productDoc);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Image upload failed");
     } finally {
@@ -1072,7 +1090,7 @@ export default function ProductsPage() {
                         </td>
                         <td className="px-4 py-4">
                           <div className="flex flex-wrap gap-2">
-                            <button type="button" onClick={() => openEdit(product)} className="rounded-lg border border-stone-200 p-2 text-stone-600 hover:bg-stone-50">
+                            <button type="button" onClick={() => void openEdit(product)} className="rounded-lg border border-stone-200 p-2 text-stone-600 hover:bg-stone-50">
                               <Pencil className="h-4 w-4" />
                             </button>
                             {product.status !== "listed" ? (
@@ -1299,23 +1317,47 @@ export default function ProductsPage() {
                       <div>
                         <p className="text-sm font-semibold text-stone-800">
                           Product FAQs (this product only)
+                          {form.faqs.length ? (
+                            <span className="ml-2 rounded-full bg-brand-maroon/10 px-2 py-0.5 text-[11px] font-medium text-brand-maroon">
+                              {form.faqs.length} saved
+                            </span>
+                          ) : null}
                         </p>
                         <p className="mt-0.5 text-xs text-stone-500">
-                          Shown on Abhimantrit product page. Leave empty = FAQ section stays hidden.
+                          Shown on Abhimantrit product page. Edit existing FAQs below, or delete any
+                          row. Leave empty = FAQ section stays hidden.
                         </p>
                       </div>
-                      <button
-                        type="button"
-                        onClick={() =>
-                          setForm((prev) => ({
-                            ...prev,
-                            faqs: [...prev.faqs, { question: "", answer: "" }],
-                          }))
-                        }
-                        className="rounded-xl border border-stone-300 bg-white px-3 py-1.5 text-xs font-medium text-stone-700"
-                      >
-                        Add FAQ
-                      </button>
+                      <div className="flex flex-wrap gap-2">
+                        {form.faqs.length ? (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              const ok = window.confirm(
+                                `Delete all ${form.faqs.length} FAQ(s) for this product?`,
+                              );
+                              if (!ok) return;
+                              setForm((prev) => ({ ...prev, faqs: [] }));
+                            }}
+                            className="inline-flex items-center gap-1 rounded-xl border border-rose-300 bg-rose-50 px-3 py-1.5 text-xs font-medium text-rose-700"
+                          >
+                            <Trash2 className="h-3.5 w-3.5" />
+                            Delete all
+                          </button>
+                        ) : null}
+                        <button
+                          type="button"
+                          onClick={() =>
+                            setForm((prev) => ({
+                              ...prev,
+                              faqs: [...prev.faqs, { question: "", answer: "" }],
+                            }))
+                          }
+                          className="rounded-xl border border-stone-300 bg-white px-3 py-1.5 text-xs font-medium text-stone-700"
+                        >
+                          Add FAQ
+                        </button>
+                      </div>
                     </div>
                     <div className="mt-3 space-y-3">
                       {form.faqs.map((faq, index) => (
@@ -1326,18 +1368,31 @@ export default function ProductsPage() {
                           <div className="mb-2 flex items-center justify-between gap-2">
                             <p className="text-xs font-semibold uppercase tracking-wide text-stone-500">
                               FAQ {index + 1}
+                              {faq.question.trim() && faq.answer.trim() ? (
+                                <span className="ml-2 font-normal normal-case text-emerald-700">
+                                  · ready
+                                </span>
+                              ) : (
+                                <span className="ml-2 font-normal normal-case text-amber-700">
+                                  · incomplete
+                                </span>
+                              )}
                             </p>
                             <button
                               type="button"
-                              onClick={() =>
+                              onClick={() => {
+                                const label = faq.question.trim() || `FAQ ${index + 1}`;
+                                const ok = window.confirm(`Delete “${label}”?`);
+                                if (!ok) return;
                                 setForm((prev) => ({
                                   ...prev,
                                   faqs: prev.faqs.filter((_, i) => i !== index),
-                                }))
-                              }
-                              className="rounded-lg border border-rose-200 px-2.5 py-1 text-[11px] text-rose-700"
+                                }));
+                              }}
+                              className="inline-flex items-center gap-1 rounded-lg border border-rose-300 bg-rose-50 px-2.5 py-1 text-[11px] font-semibold text-rose-700 hover:bg-rose-100"
                             >
-                              Remove
+                              <Trash2 className="h-3 w-3" />
+                              Delete
                             </button>
                           </div>
                           <label className="block text-sm">
@@ -1377,7 +1432,7 @@ export default function ProductsPage() {
                       ))}
                       {!form.faqs.length ? (
                         <p className="text-xs text-stone-500">
-                          No FAQs for this product yet. Add one only if you want them on the product
+                          No FAQs for this product yet. Click Add FAQ to create one for the product
                           page.
                         </p>
                       ) : null}
